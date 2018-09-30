@@ -1,0 +1,43 @@
+################################################################
+# entryPoints configuration
+################################################################
+# defaultEntryPoints = ["http"]
+
+# [entryPoints]
+  # [entryPoints.http]
+  # address = ":80"
+
+  # [entryPoints.foo]
+  # address = ":8082"
+
+  # [entryPoints.bar]
+  # address = ":8083"
+
+################################################################
+# API and dashboard configuration
+################################################################
+#[api]
+# entryPoint = "bar"
+
+################################################################
+# Docker configuration backend
+################################################################
+debug = true
+
+defaultEntryPoints = ["http"]
+
+[entryPoints]
+    [entryPoints.http]
+    address = ":80"
+    [entryPoints.http.auth.basic]
+    users = ["ohuser:$apr1$ffMQdoZd$1uEyKkwOKH3QS9ovOAzYj1"]
+
+
+# [retry]
+
+# [docker]
+# endpoint = "unix:///var/run/docker.sock"
+# exposedByDefault = true
+# watch = true
+# swarmmode = true
+

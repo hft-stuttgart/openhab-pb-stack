@@ -1,0 +1,312 @@
+version: "3.3"
+
+# demo credentials
+# user: ohuser
+# password: ohpass
+
+networks:
+    habnet:
+        driver: overlay
+        attachable: true
+
+configs:
+    sftp_config:
+        file: ./configs/ssh/sshd_config
+    sftp_users:
+        file: ./configs/ssh/sftp_users.conf
+    sftp_key_rsa:
+        file: ./configs/ssh/ssh_host_rsa_key
+    sftp_key_ed:
+        file: ./configs/ssh/ssh_host_ed25519_key
+    sftp_id_pub:
+        file: ./configs/ssh/id_rsa.pub
+    sftp_id_key:
+        file: ./configs/ssh/id_rsa
+    traefik_proxy:
+        file: ./configs/traefik/traefik.toml
+    nodered_settings:
+        file: ./configs/nodered/nodered_settings.js
+    nodered_package:
+        file: ./configs/nodered/nodered_package.json
+    mosquitto_passwords:
+        file: ./configs/mosquitto/mosquitto_passwords
+    mosquitto_settings:
+        file: ./configs/mosquitto/mosquitto.conf
+    influx_init:
+        file: ./configs/influxdb/init-influxdb.sh
+    influx_user:
+        file: ./configs/influxdb/influxdb_user
+
+volumes:
+    openhab_addons:
+    openhab_conf:
+    openhab_userdata:
+    nodered_data:
+    mosquitto_data:
+    influxdb_data:
+    unison_data:
+    backup_data:
+    backup_cache:
+
+services:
+    backup1:
+        image: blacklabelops/volumerize
+        volumes:
+            - "openhab_userdata:/source/openhab_userdata"
+            - "openhab_conf:/source/openhab_conf"
+            - "openhab_addons:/source/openhab_addons"
+            - "nodered_data:/source/nodered_data"
+            - "influxdb_data:/source/influxdb_data"
+            - "backup_cache:/volumerize-cache"
+            - "backup_data:/backup"
+        environment:
+            - VOLUMERIZE_SOURCE=/source
+            - VOLUMERIZE_TARGET=file:///backup/b1
+        deploy:
+            placement:
+                constraints:
+                    - node.labels.building == b1
+    sftp:
+        image: "doblix/sftp-unison"
+        volumes:
+            - "openhab_userdata:/home/ohuser/openhab_userdata"
+            - "openhab_conf:/home/ohuser/openhab_conf"
+            - "nodered_data:/home/ohuser/nodered_data"
+            - "backup_data:/home/ohuser/backup_data"
+            - "unison_data:/home/ohuser/.unison"
+        ports:
+            - "2222:22"
+        configs:
+            - source: sftp_config
+              target: /etc/ssh/sshd_config
+            - source: sftp_users
+              target: /etc/sftp/users.conf
+            - source: sftp_key_ed
+              target: /etc/ssh/ssh_host_ed25519_key
+              mode: 0400
+            - source: sftp_key_rsa
+              target: /etc/ssh/ssh_host_rsa_key
+              mode: 0400
+            - source: sftp_id_key
+              target: /home/ohuser/.ssh/id_rsa
+              uid: '9001'
+              mode: 0400
+            - source: sftp_id_pub
+              target: /home/ohuser/.ssh/keys/sync.pub
+        networks:
+            - habnet
+        deploy:
+            placement:
+                constraints:
+                    - node.labels.building == b1
+    sftp2:
+        image: "doblix/sftp-unison"
+        volumes:
+            - "openhab_conf:/home/ohuser/openhab_conf"
+            - "backup_data:/home/ohuser/backup_data"
+            - "unison_data:/home/ohuser/.unison"
+        ports:
+            - "2223:22"
+        configs:
+            - source: sftp_users
+              target: /etc/sftp/users.conf
+            - source: sftp_key_ed
+              target: /etc/ssh/ssh_host_ed25519_key
+              mode: 0400
+            - source: sftp_key_rsa
+              target: /etc/ssh/ssh_host_rsa_key
+              mode: 0400
+            - source: sftp_id_key
+              target: /home/ohuser/.ssh/id_rsa
+              uid: '9001'
+              mode: 0400
+            - source: sftp_id_pub
+              target: /home/ohuser/.ssh/keys/sync.pub
+        networks:
+            - habnet
+        deploy:
+            placement:
+                constraints:
+                    - node.labels.building == b2
+    sftp3:
+        image: "doblix/sftp-unison"
+        volumes:
+            - "openhab_conf:/home/ohuser/openhab_conf"
+            - "backup_data:/home/ohuser/backup_data"
+            - "unison_data:/home/ohuser/.unison"
+        ports:
+            - "2224:22"
+        configs:
+            - source: sftp_users
+              target: /etc/sftp/users.conf
+            - source: sftp_key_ed
+              target: /etc/ssh/ssh_host_ed25519_key
+              mode: 0400
+            - source: sftp_key_rsa
+              target: /etc/ssh/ssh_host_rsa_key
+              mode: 0400
+            - source: sftp_id_key
+              target: /home/ohuser/.ssh/id_rsa
+              uid: '9001'
+              mode: 0400
+            - source: sftp_id_pub
+              target: /home/ohuser/.ssh/keys/sync.pub
+        networks:
+            - habnet
+        deploy:
+            placement:
+                constraints:
+                    - node.labels.building == b3
+    openhab:
+        image: "openhab/openhab:2.3.0-amd64-debian"
+        volumes:
+            - "/etc/localtime:/etc/localtime:ro"
+            - "/etc/timezone:/etc/timezone:ro"
+            - "openhab_addons:/openhab/addons"
+            - "openhab_conf:/openhab/conf"
+            - "openhab_userdata:/openhab/userdata"
+        environment:
+            OPENHAB_HTTP_PORT: "8181"
+            OPENHAB_HTTPS_PORT: "8443"
+        networks:
+            - habnet
+        deploy:
+            labels:
+                - "traefik.docker.network=ohSwarmTest_habnet"
+                - "traefik.port=8181"
+                - "traefik.backend=openhab"
+                - "traefik.frontend.rule=Host:ohmachine1"
+            placement:
+                constraints:
+                    - node.labels.building == b1
+    openhab2:
+        image: "openhab/openhab:2.3.0-amd64-debian"
+        volumes:
+            - "/etc/localtime:/etc/localtime:ro"
+            - "/etc/timezone:/etc/timezone:ro"
+            - "openhab_addons:/openhab/addons"
+            - "openhab_conf:/openhab/conf"
+            - "openhab_userdata:/openhab/userdata"
+        environment:
+            OPENHAB_HTTP_PORT: "8282"
+            OPENHAB_HTTPS_PORT: "8444"
+        networks:
+            - habnet
+        deploy:
+            labels:
+                - "traefik.docker.network=ohSwarmTest_habnet"
+                - "traefik.port=8282"
+                - "traefik.backend=openhab2"
+                - "traefik.frontend.rule=Host:ohmachine2"
+            placement:
+                constraints:
+                    - node.labels.building == b2
+    openhab3:
+        image: "openhab/openhab:2.3.0-amd64-debian"
+        volumes:
+            - "/etc/localtime:/etc/localtime:ro"
+            - "/etc/timezone:/etc/timezone:ro"
+            - "openhab_addons:/openhab/addons"
+            - "openhab_conf:/openhab/conf"
+            - "openhab_userdata:/openhab/userdata"
+        environment:
+            OPENHAB_HTTP_PORT: "8383"
+            OPENHAB_HTTPS_PORT: "8445"
+        networks:
+            - habnet
+        deploy:
+            labels:
+                - "traefik.docker.network=ohSwarmTest_habnet"
+                - "traefik.port=8383"
+                - "traefik.backend=openhab3"
+                - "traefik.frontend.rule=Host:ohmachine3"
+            placement:
+                constraints:
+                    - node.labels.building == b3
+    nodered:
+        image: "nodered/node-red-docker"
+        volumes:
+            - "nodered_data:/data"
+        networks:
+            - habnet
+        configs:
+            - source: nodered_package
+              target: /data/package.json
+            - source: nodered_settings
+              target: /data/settings.js
+        deploy:
+            labels:
+                - "traefik.port=1880"
+                - "traefik.backend=nodered"
+                - "traefik.docker.network=ohSwarmTest_habnet"
+                - "traefik.frontend.rule=HostRegexp:rules.{domain:[a-zA-z0-9-]+}"
+            placement:
+                constraints:
+                    - node.labels.building == b1
+    mqtt:
+        image: "eclipse-mosquitto"
+        volumes:
+            - "mosquitto_data:/mosquitto/data"
+        ports:
+            - "9001:9001"
+            - "1883:1883"
+        configs:
+            - source: mosquitto_passwords
+              target: /mosquitto/config/passwd
+            - source: mosquitto_settings
+              target: /mosquitto/config/mosquitto.conf
+        networks:
+            - habnet
+    db:
+        image: "influxdb"
+        volumes:
+            - "influxdb_data:/var/lib/influxdb"
+        configs:
+            - source: influx_init
+              target: /init-influxdb.sh
+              mode: 0555
+            - source: influx_user
+              target: /run/secrets/influx_user
+        environment:
+            INFLUXDB_HTTP_AUTH_ENABLED: "true"
+            INFLUXDB_DB: "openhab"
+            INFLUXDB_ADMIN_USER: "ohadmin"
+            INFLUXDB_ADMIN_PASSWORD: "ohadmin"
+            INFLUXDB_USER_FILE: "/run/secrets/influx_user"
+            INFLUXDB_USER_PASSWORD: "ohtest"
+        networks:
+            - habnet
+        deploy:
+            placement:
+                constraints:
+                    - node.labels.building == b1
+    grafana:
+        image: "grafana/grafana"
+        networks:
+            - habnet
+        ports:
+            - "3000:3000"
+        deploy:
+            labels:
+                - "traefik.port=3000"
+                - "traefik.backend=grafna"
+                - "traefik.docker.network=ohSwarmTest_habnet"
+                - "traefik.frontend.rule=HostRegexp:graphs.{domain:[a-zA-z0-9-]+}"
+    proxy:
+        image: "traefik"
+        command: --api --docker --docker.swarmMode --logLevel="DEBUG"
+        volumes:
+            - "/var/run/docker.sock:/var/run/docker.sock"
+        ports:
+            - "8080:8080"
+            - "80:80"
+        networks:
+            - habnet
+        configs:
+            - source: traefik_proxy
+              target: /etc/traefik/traefik.toml
+        deploy:
+            mode: global
+            placement:
+                constraints:
+                    - node.role == manager

@@ -1,0 +1,8 @@
+{
+  "name": "node-red-project",
+  "description": "A Node-RED Project",
+  "version": "0.1.0",
+  "dependencies": {
+    "node-red-contrib-openhab2": "~1.1.3"
+  }
+}
