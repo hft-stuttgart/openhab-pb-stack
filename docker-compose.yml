@@ -10,6 +10,12 @@ networks:
         attachable: true
 
 configs:
+    backup_config_b1:
+        file: ./configs/volumerize/backup_config_b1.json
+    backup_config_b2:
+        file: ./configs/volumerize/backup_config_b2.json
+    backup_config_b3:
+        file: ./configs/volumerize/backup_config_b3.json
     sftp_config:
         file: ./configs/ssh/sshd_config
     sftp_users:
@@ -22,6 +28,8 @@ configs:
         file: ./configs/ssh/id_rsa.pub
     sftp_id_key:
         file: ./configs/ssh/id_rsa
+    sftp_known_hosts:
+        file: ./configs/ssh/known_hosts
     traefik_proxy:
         file: ./configs/traefik/traefik.toml
     nodered_settings:
