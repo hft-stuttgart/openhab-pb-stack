@@ -247,10 +247,11 @@ services:
             - habnet
         deploy:
             labels:
+                - "backup=b1"
                 - "traefik.docker.network=ohSwarmTest_habnet"
                 - "traefik.port=8181"
                 - "traefik.backend=openhab"
-                - "traefik.frontend.rule=Host:ohmachine1"
+                - "traefik.frontend.rule=HostRegexp:bau1.{domain:[a-zA-z0-9-]+}"
             placement:
                 constraints:
                     - node.labels.building == b1
@@ -269,10 +270,11 @@ services:
             - habnet
         deploy:
             labels:
+                - "backup=b2"
                 - "traefik.docker.network=ohSwarmTest_habnet"
                 - "traefik.port=8282"
                 - "traefik.backend=openhab2"
-                - "traefik.frontend.rule=Host:ohmachine2"
+                - "traefik.frontend.rule=HostRegexp:bau2.{domain:[a-zA-z0-9-]+}"
             placement:
                 constraints:
                     - node.labels.building == b2
@@ -291,10 +293,11 @@ services:
             - habnet
         deploy:
             labels:
+                - "backup=b3"
                 - "traefik.docker.network=ohSwarmTest_habnet"
                 - "traefik.port=8383"
                 - "traefik.backend=openhab3"
-                - "traefik.frontend.rule=Host:ohmachine3"
+                - "traefik.frontend.rule=HostRegexp:bau3.{domain:[a-zA-z0-9-]+}"
             placement:
                 constraints:
                     - node.labels.building == b3
@@ -311,6 +314,7 @@ services:
               target: /data/settings.js
         deploy:
             labels:
+                - "backup=b1"
                 - "traefik.port=1880"
                 - "traefik.backend=nodered"
                 - "traefik.docker.network=ohSwarmTest_habnet"
