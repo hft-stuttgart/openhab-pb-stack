@@ -67,9 +67,21 @@ services:
             - "influxdb_data:/source/influxdb_data"
             - "backup_cache:/volumerize-cache"
             - "backup_data:/backup"
+        configs:
+            - source: backup_config_b1
+              target: /backup_config.json
+            - source: sftp_id_key
+              target: /root/.ssh/id_rsa
+              mode: 0400
+            - source: sftp_known_hosts
+              target: /root/.ssh/known_hosts
+              mode: 0400
         environment:
             - VOLUMERIZE_SOURCE=/source
-            - VOLUMERIZE_TARGET=file:///backup/b1
+            - VOLUMERIZE_TARGET='multi:///backup_config.json?mode=mirror&onfail=abort'
+            - VOLUMERIZE_DUPLICITY_OPTIONS=--ssh-options "-oStrictHostKeyChecking=no"
+        networks:
+            - habnet
         deploy:
             placement:
                 constraints:
