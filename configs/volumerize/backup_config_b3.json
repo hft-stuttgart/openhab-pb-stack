@@ -1,0 +1,14 @@
+[
+ {
+  "description": "Backup Directory Server 1",
+  "url": "sftp://ohuser:ohpass@sftp://home/ohuser/backup_data/b3"
+ },
+ {
+  "description": "Backup Directory Server 2",
+  "url": "sftp://ohuser:ohpass@sftp2://home/ohuser/backup_data/b3"
+ }, 
+ {
+  "description": "Backup Directory Server 3",
+  "url": "sftp://ohuser:ohpass@sftp3://home/ohuser/backup_data/b3"
+ }
+]
