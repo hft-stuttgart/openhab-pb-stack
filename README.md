@@ -50,3 +50,7 @@ docker node update --label-add building=b3 <NAME_OF_HOST_3>
 Docker swarm should pick up the changes automatically and start openHAB on each machine.
 
 The instances should then be available on the subdomains b1, b2, b3 on each of the hosts.
+
+## Building Manager Script
+
+To ease initial setup and management the `building_manager.py` is provided. This script adds commands to create and control a multi building setup. To use it you first have to install its requirements by calling `pip install requirements.txt`
