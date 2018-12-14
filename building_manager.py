@@ -2,6 +2,53 @@
 import docker
 
 
+# Docker machine commands
+def get_machine_list():
+    """Get a list of docker machine names using the docker-machine system command
+
+    :returns: a list of machine names managed by docker-machine
+    """
+    from subprocess import run
+    machine_result = run(['docker-machine', 'ls', '-q'],
+                         text=True,
+                         capture_output=True)
+    return machine_result.stdout.splitlines()
+
+
+def check_machine_exists(machine_name):
+    """Checks weather a docker machine exists and is available
+
+    :machine_name: Name of the machine to check
+    :returns: TODO
+    """
+    machines = get_machine_list()
+
+    return machine_name in machines
+
+
+def get_machine_env(machine_name):
+    """Gets dict of env settings from a machine
+
+    :machine_name: Name of the machine to check
+    :returns: Dict of env variables for this machine
+    """
+    from subprocess import run
+    env_result = run(['docker-machine', 'env', machine_name],
+                     text=True,
+                     capture_output=True)
+
+    machine_envs = {}
+
+    lines = env_result.stdout.splitlines()
+    for line in lines:
+        if 'export' in line:
+            assign = line.split('export ', 1)[1]
+            env_entry = [a.strip('"') for a in assign.split('=', 1)]
+            machine_envs[env_entry[0]] = env_entry[1]
+    return machine_envs
+
+
+# Docker client commands
 def run_command_in_service(service, command, building=None):
     """Runs a command in a service based on its name.
     When no matching container is found or the service name is ambigous
@@ -12,7 +59,11 @@ def run_command_in_service(service, command, building=None):
     :param building: Optional building, make service unambigous (Default: None)
     """
 
-    client = docker.from_env()
+    if building:
+        building_env = get_machine_env(building)
+        client = docker.from_env(environment=building_env)
+    else:
+        client = docker.from_env()
 
     # Find containers matching name
     service_name_filter = {"name": service}
@@ -33,6 +84,7 @@ def run_command_in_service(service, command, building=None):
         print(service_container.exec_run(command))
 
 
+# CLI base commands and main
 def execute_command(args):
     """Top level function to manage command executions from CLI
 
@@ -50,7 +102,16 @@ def restore_command(args):
 
     :args: parsed commandline arguments
     """
-    pass
+    building = args.building
+    target = args.target
+
+    if not check_machine_exists(target):
+        print('Machine with name {} not found'.format(target))
+        return
+
+    print('Restoring building {} on machine {}'.format(building, target))
+
+    get_machine_env(target)
 
 
 if __name__ == '__main__':
@@ -64,8 +125,7 @@ if __name__ == '__main__':
     # Restore command
     parser_restore = subparsers.add_parser('restore', help='Restore backups')
     parser_restore.add_argument(
-        'building_name',
-        help='Name (label) of the building that shall be restored')
+        'building', help='Name (label) of the building that shall be restored')
     parser_restore.add_argument(
         'target', help='Name of the machine to restore to')
     parser_restore.set_defaults(func=restore_command)
