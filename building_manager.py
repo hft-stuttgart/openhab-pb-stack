@@ -1,8 +1,26 @@
 #!/usr/bin/env python
 import docker
+import os
+
+# Directories for config generation
+CONFIG_DIRS = [
+    'influxdb', 'mosquitto', 'nodered', 'ssh', 'treafik', 'volumerize'
+]
 
 
-# Docker machine commands
+# Config file functions
+def generate_config_folders(base_path):
+    """Generate folders for configuration files
+
+    :base_path: Path to add folders to
+    """
+    for d in CONFIG_DIRS:
+        new_dir = base_path + '/' + d
+        if not os.path.exists(new_dir):
+            os.makedirs(new_dir)
+
+
+# Docker machine functions
 def get_machine_list():
     """Get a list of docker machine names using the docker-machine system command
 
@@ -103,6 +121,23 @@ def run_command_in_service(service, command, building=None):
 
 
 # CLI base commands and main
+def init_config_dirs_command(args):
+    """Initialize config directories
+
+    :args: parsed commandline arguments
+    """
+    base_dir = args.base_dir
+
+    if base_dir is None:
+        current_dir = os.getcwd()
+        base_dir = current_dir + '/custom_configs'
+        if not os.path.exists(base_dir):
+            os.makedirs(base_dir)
+
+    print('Initialize configuration in {}'.format(base_dir))
+    generate_config_folders(base_dir)
+
+
 def assign_building_command(args):
     """Assigns the role of a building to a node
 
@@ -183,6 +218,19 @@ if __name__ == '__main__':
         help='Building name (label) of the service if '
         'service location is ambiguous')
     parser_exec.set_defaults(func=execute_command)
+
+    # Config commands
+    parser_config = subparsers.add_parser(
+        'config', help='Manage configuration files')
+    parser_config_subs = parser_config.add_subparsers()
+    # - Config init
+    parser_config_init = parser_config_subs.add_parser(
+        'init', help='Initialize config file directories')
+    parser_config_init.add_argument(
+        '--base_dir',
+        '-d',
+        help='Directory to creat config folders in, default is current dir')
+    parser_config_init.set_defaults(func=init_config_dirs_command)
 
     args = parser.parse_args()
     args.func(args)
