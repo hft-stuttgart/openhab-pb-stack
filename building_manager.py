@@ -49,6 +49,23 @@ def get_machine_env(machine_name):
 
 
 # Docker client commands
+def assign_label_to_node(nodeid, label, value):
+    """Assigns a label to a node (e.g. building)
+
+    :nodeid: Id or name of the node
+    :label: Label you want to add
+    :value: The value to assign to the label
+    """
+    client = docker.from_env()
+
+    node = client.nodes.get(nodeid)
+    spec = node.attrs['Spec']
+    spec['Labels'][label] = value
+    node.update(spec)
+
+    client.close()
+
+
 def run_command_in_service(service, command, building=None):
     """Runs a command in a service based on its name.
     When no matching container is found or the service name is ambigous
@@ -82,9 +99,23 @@ def run_command_in_service(service, command, building=None):
             command, service_container.name, service_container.short_id,
             building))
         print(service_container.exec_run(command))
+    client.close()
 
 
 # CLI base commands and main
+def assign_building_command(args):
+    """Assigns the role of a building to a node
+
+    :args: parsed commandline arguments
+    """
+    node = args.node
+    building = args.building
+
+    print('Assign role of building {} to node {}'.format(building, node))
+
+    assign_label_to_node(node, 'building', building)
+
+
 def execute_command(args):
     """Top level function to manage command executions from CLI
 
@@ -129,6 +160,15 @@ if __name__ == '__main__':
     parser_restore.add_argument(
         'target', help='Name of the machine to restore to')
     parser_restore.set_defaults(func=restore_command)
+
+    # Assign building command
+    parser_assign_building = subparsers.add_parser(
+        'assign_building', help='Assign the role of a building to a node')
+    parser_assign_building.add_argument(
+        'node', help='Name (or ID) of the node that gets the role assigned')
+    parser_assign_building.add_argument(
+        'building', help='Name of the building that will be assigned')
+    parser_assign_building.set_defaults(func=assign_building_command)
 
     # Execute command
     parser_exec = subparsers.add_parser(
