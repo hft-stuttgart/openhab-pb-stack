@@ -3,7 +3,13 @@ chardet==3.0.4
 docker==3.6.0
 docker-pycreds==0.4.0
 idna==2.7
+prompt-toolkit==1.0.14
+Pygments==2.3.1
+PyInquirer==1.0.3
+PyYAML==3.13
+regex==2018.11.22
 requests==2.20.1
 six==1.11.0
 urllib3==1.24.1
+wcwidth==0.1.7
 websocket-client==0.54.0

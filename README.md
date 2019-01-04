@@ -54,3 +54,21 @@ The instances should then be available on the subdomains b1, b2, b3 on each of t
 ## Building Manager Script
 
 To ease initial setup and management the `building_manager.py` is provided. This script adds commands to create and control a multi building setup. To use it you first have to install its requirements by calling `pip install requirements.txt`
+
+### Requirements
+The script has a few requirements for the system and the python environment.
+
+**System:**
+```sh
+docker
+docker-compose
+docker-machine
+python
+```
+
+**Python:**
+```sh
+docker
+PyInquirer
+pyyaml
+```
