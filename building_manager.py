@@ -2,13 +2,17 @@
 import docker
 import os
 
+from PyInquirer import prompt
+
 # Directories for config generation
 CONFIG_DIRS = [
     'influxdb', 'mosquitto', 'nodered', 'ssh', 'treafik', 'volumerize'
 ]
 
 
+# ******************************
 # Config file functions
+# ******************************
 def generate_config_folders(base_path):
     """Generate folders for configuration files
 
@@ -20,7 +24,9 @@ def generate_config_folders(base_path):
             os.makedirs(new_dir)
 
 
+# ******************************
 # Docker machine functions
+# ******************************
 def get_machine_list():
     """Get a list of docker machine names using the docker-machine system command
 
@@ -66,7 +72,9 @@ def get_machine_env(machine_name):
     return machine_envs
 
 
+# ******************************
 # Docker client commands
+# ******************************
 def assign_label_to_node(nodeid, label, value):
     """Assigns a label to a node (e.g. building)
 
@@ -120,7 +128,9 @@ def run_command_in_service(service, command, building=None):
     client.close()
 
 
+# ******************************
 # CLI base commands and main
+# ******************************
 def init_config_dirs_command(args):
     """Initialize config directories
 
@@ -180,6 +190,63 @@ def restore_command(args):
     get_machine_env(target)
 
 
+def interactive_command(args):
+    """Top level function to start the interactive mode
+
+    :args: command line arguments
+    """
+    print(main_menu())
+
+
+# ******************************
+# Interactive menu entries
+# ******************************
+def main_menu():
+    """ Display main menu
+    """
+    questions = [{
+        'type':
+        'list',
+        'name':
+        'main',
+        'message':
+        'Public Building Manager - Main Menu',
+        'choices': ['Create initial structure', 'Execute command', 'Exit']
+    }]
+    answers = prompt(questions)
+
+    if 'Create' in answers['main']:
+        init_menu()
+
+    return answers
+
+
+def init_menu():
+    """Menu entry for initial setup and file generation
+    """
+    questions = [
+        {
+            'type': 'input',
+            'name': 'stack_name',
+            'message': 'Choose a name for your setup'
+        },
+        {
+            'type': 'checkbox',
+            'name': 'machines',
+            'message': 'What docker machines will be used?',
+            'choices': [{
+                'name': m
+            } for m in get_machine_list()]
+        },
+    ]
+    answers = prompt(questions)
+
+    print(answers)
+
+
+# ******************************
+# Script main (entry)
+# ******************************
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser(
@@ -187,6 +254,12 @@ if __name__ == '__main__':
         description='Generate and manage multi'
         'building configurations of openHAB with docker swarm')
     subparsers = parser.add_subparsers()
+
+    # Interactive mode
+    parser_interactive = subparsers.add_parser(
+        'interactive',
+        help='Starts the interactive mode of the building manager')
+    parser_interactive.set_defaults(func=interactive_command)
 
     # Restore command
     parser_restore = subparsers.add_parser('restore', help='Restore backups')
