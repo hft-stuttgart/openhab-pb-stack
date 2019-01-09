@@ -11,7 +11,7 @@ CONFIG_DIRS = [
 
 
 # ******************************
-# Config file functions
+# Config file functions {{{
 # ******************************
 def generate_config_folders(base_path):
     """Generate folders for configuration files
@@ -24,8 +24,11 @@ def generate_config_folders(base_path):
             os.makedirs(new_dir)
 
 
+# }}}
+
+
 # ******************************
-# Docker machine functions
+# Docker machine functions {{{
 # ******************************
 def get_machine_list():
     """Get a list of docker machine names using the docker-machine system command
@@ -43,7 +46,7 @@ def check_machine_exists(machine_name):
     """Checks weather a docker machine exists and is available
 
     :machine_name: Name of the machine to check
-    :returns: TODO
+    :returns: True when machine is available
     """
     machines = get_machine_list()
 
@@ -72,8 +75,11 @@ def get_machine_env(machine_name):
     return machine_envs
 
 
+# }}}
+
+
 # ******************************
-# Docker client commands
+# Docker client commands {{{
 # ******************************
 def assign_label_to_node(nodeid, label, value):
     """Assigns a label to a node (e.g. building)
@@ -128,8 +134,11 @@ def run_command_in_service(service, command, building=None):
     client.close()
 
 
+# }}}
+
+
 # ******************************
-# CLI base commands and main
+# CLI base commands {{{
 # ******************************
 def init_config_dirs_command(args):
     """Initialize config directories
@@ -198,8 +207,11 @@ def interactive_command(args):
     print(main_menu())
 
 
+# }}}
+
+
 # ******************************
-# Interactive menu entries
+# Interactive menu entries {{{
 # ******************************
 def main_menu():
     """ Display main menu
@@ -244,8 +256,10 @@ def init_menu():
     print(answers)
 
 
+# }}}
+
 # ******************************
-# Script main (entry)
+# Script main (entry) {{{
 # ******************************
 if __name__ == '__main__':
     import argparse
@@ -307,3 +321,7 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     args.func(args)
+# }}}
+
+# --- vim settings ---
+# vim:foldmethod=marker:foldlevel=0
