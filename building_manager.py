@@ -3,13 +3,16 @@ import docker
 import logging
 import os
 
-from PyInquirer import prompt
+from shutil import copy2
 from subprocess import run
+from PyInquirer import prompt
 
 # Log level during development is info
 logging.basicConfig(level=logging.WARNING)
 
 # Directories for config generation
+CUSTOM_DIR = 'custom_configs'
+TEMPLATE_DIR = 'template_configs'
 CONFIG_DIRS = [
     'influxdb', 'mosquitto', 'nodered', 'ssh', 'treafik', 'volumerize'
 ]
@@ -21,15 +24,33 @@ SWARM_PORT = 2377
 # ******************************
 # Config file functions {{{
 # ******************************
-def generate_config_folders(base_path):
+def generate_config_folders(base_dir):
     """Generate folders for configuration files
 
-    :base_path: Path to add folders to
+    :base_dir: Path to add folders to
     """
+    base_path = base_dir + '/' + CUSTOM_DIR
+    if not os.path.exists(base_dir):
+        os.makedirs(base_dir)
+
+    print(f'Initialize configuration in {base_path}')
+
     for d in CONFIG_DIRS:
         new_dir = base_path + '/' + d
         if not os.path.exists(new_dir):
             os.makedirs(new_dir)
+
+
+def copy_template_config(base_dir, config_path):
+    """Copies template configuration files into custom folder
+
+    :base_dir: path that contains template and custom folders
+    :config_path: relative path of config to copy from template
+    """
+    custom_path = base_dir + '/' + CUSTOM_DIR
+    template_path = base_dir + '/' + TEMPLATE_DIR
+    print(f'Copy {config_path} from {custom_path to} {template_path}')
+    pass
 
 
 # }}}
@@ -201,12 +222,8 @@ def init_config_dirs_command(args):
     base_dir = args.base_dir
 
     if base_dir is None:
-        current_dir = os.getcwd()
-        base_dir = current_dir + '/custom_configs'
-        if not os.path.exists(base_dir):
-            os.makedirs(base_dir)
+        base_dir = os.getcwd()
 
-    print(f'Initialize configuration in {base_dir}')
     generate_config_folders(base_dir)
 
 
@@ -310,7 +327,7 @@ def init_menu():
         # init swarm with first machine
         if leader is None:
             leader = machine
-            print(f'Creat initial swarm with leader {leader}')
+            print(f'Create initial swarm with leader {leader}')
             if init_swarm_machine(leader):
                 print('Swarm init successful\n')
         else:

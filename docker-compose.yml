@@ -351,7 +351,7 @@ services:
             INFLUXDB_DB: "openhab"
             INFLUXDB_ADMIN_USER: "ohadmin"
             INFLUXDB_ADMIN_PASSWORD: "ohadmin"
-            INFLUXDB_USER_FILE: "/run/secrets/influx_user"
+            INFLUXDB_USER: "ohuser"
             INFLUXDB_USER_PASSWORD: "ohtest"
         networks:
             - habnet

@@ -64,6 +64,7 @@ docker
 docker-compose
 docker-machine
 python
+mosquitto (mosquitto_passwd utility)
 ```
 
 **Python:**
@@ -72,3 +73,24 @@ docker
 PyInquirer
 pyyaml
 ```
+
+All python requirements are installable using `pip install -r requirements.txt` pointing to the requirements.txt file in this repo.
+
+### Config file generation
+
+The openhab-pb stack consists of multiple configuration files that need to be available and will be used by the docker containers. The Manager Script generates these for convinience. In addition they are documented here, sorted by application/folder, to understand their usecases.
+
+**mosquitto**
+
+- *mosquitto.conf*: basic configuration of mosquitto
+  - disables anonymous access
+  - enables usage of password file
+- *mosquitto_passwords*: List of users/passwords that gain access to mosquitto
+  - generated with `mosquitto_passwd`
+
+**nodered**
+
+- *nodered_package.json*: packages to be installed when node red is setup
+  - contains entry for openhab package
+- *nodered_settings*: basic node red config
+  - contains `httpNodeAuth` for users
