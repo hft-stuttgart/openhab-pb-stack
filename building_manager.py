@@ -1,15 +1,20 @@
 #!/usr/bin/env python
 import docker
+import logging
 import os
 
 from PyInquirer import prompt
+from subprocess import run
+
+# Log level during development is info
+logging.basicConfig(level=logging.WARNING)
 
 # Directories for config generation
 CONFIG_DIRS = [
     'influxdb', 'mosquitto', 'nodered', 'ssh', 'treafik', 'volumerize'
 ]
 
-#Default Swarm port
+# Default Swarm port
 SWARM_PORT = 2377
 
 
@@ -38,7 +43,6 @@ def get_machine_list():
 
     :returns: a list of machine names managed by docker-machine
     """
-    from subprocess import run
     machine_result = run(['docker-machine', 'ls', '-q'],
                          text=True,
                          capture_output=True)
@@ -62,7 +66,6 @@ def get_machine_env(machine_name):
     :machine_name: Name of the machine to check
     :returns: Dict of env variables for this machine
     """
-    from subprocess import run
     env_result = run(['docker-machine', 'env', machine_name],
                      text=True,
                      capture_output=True)
@@ -83,25 +86,24 @@ def get_machine_ip(machine_name):
 
     :machine_name: Name of the machine to use for init
     """
-    from subprocess import run
     machine_result = run(['docker-machine', 'ip', machine_name],
                          text=True,
                          capture_output=True)
-    return machine_result.stdout
+    return machine_result.stdout.strip()
 
 
 def init_swarm_machine(machine_name):
     """Creates a new swarm with the specified machine as leader
 
     :machine_name: Name of the machine to use for init
+    :return: True if swarm init was successful
     """
-    from subprocess import run
     machine_ip = get_machine_ip(machine_name)
     init_command = 'docker swarm init --advertise-addr ' + machine_ip
-    machine_result = run(['docker-machine', 'ssh', machine_name, init_command],
-                         text=True,
-                         capture_output=True)
-    return machine_result.stdout
+    init_result = run(['docker-machine', 'ssh', machine_name, init_command],
+                      text=True,
+                      capture_output=True)
+    return init_result.returncode == 0
 
 
 def join_swarm_machine(machine_name, leader_name):
@@ -109,22 +111,23 @@ def join_swarm_machine(machine_name, leader_name):
 
     :machine_name: Name of the machine to join a swarm
     :leader_name: Name of the swarm leader machine
+    :return: True if join to swarm was successful
     """
-    from subprocess import run
     token_command = 'docker swarm join-token manager -q'
     token_result = run(['docker-machine', 'ssh', leader_name, token_command],
                        text=True,
                        capture_output=True)
-    token = token_result.stdout
+    token = token_result.stdout.strip()
     leader_ip = get_machine_ip(leader_name)
+    logging.info(f"Swarm leader with ip {leader_ip} uses token {token}")
 
-    join_command = 'docker swarm join --token {} {}{}'.format(
-        token, leader_ip, SWARM_PORT)
-    join_result = run(['docker-machine', 'ssh', machine_name, join_command],
+    join_cmd = f'docker swarm join --token {token} {leader_ip}:{SWARM_PORT}'
+    logging.info(f'Machine {machine_name} joins using command {join_cmd}')
+    join_result = run(['docker-machine', 'ssh', machine_name, join_cmd],
                       text=True,
                       capture_output=True)
 
-    return join_result.stdout
+    return join_result.returncode == 0
 
 
 # }}}
@@ -172,16 +175,14 @@ def run_command_in_service(service, command, building=None):
 
     # Ensure match is unambigous
     if (len(containers) > 1):
-        print('Found multiple containers matching service name, '
+        print(f'Found multiple containers matching service name {service}, '
               'ensure service is unambigous')
     elif (len(containers) < 1):
-        print(
-            'Found no matching container for service name {}'.format(service))
+        print(f'Found no matching container for service name {service}')
     else:
         service_container = containers[0]
-        print('Executing {} in container {} ({}) on building {}'.format(
-            command, service_container.name, service_container.short_id,
-            building))
+        print(f'Executing {command} in container {service_container.name}'
+              f'({service_container.id}) on building {building}')
         print(service_container.exec_run(command))
     client.close()
 
@@ -205,7 +206,7 @@ def init_config_dirs_command(args):
         if not os.path.exists(base_dir):
             os.makedirs(base_dir)
 
-    print('Initialize configuration in {}'.format(base_dir))
+    print(f'Initialize configuration in {base_dir}')
     generate_config_folders(base_dir)
 
 
@@ -217,7 +218,7 @@ def assign_building_command(args):
     node = args.node
     building = args.building
 
-    print('Assign role of building {} to node {}'.format(building, node))
+    print(f'Assign role of building {building} to node {node}')
 
     assign_label_to_node(node, 'building', building)
 
@@ -243,10 +244,10 @@ def restore_command(args):
     target = args.target
 
     if not check_machine_exists(target):
-        print('Machine with name {} not found'.format(target))
+        print(f'Machine with name {target} not found')
         return
 
-    print('Restoring building {} on machine {}'.format(building, target))
+    print(f'Restoring building {building} on machine {target}')
 
     get_machine_env(target)
 
@@ -309,9 +310,13 @@ def init_menu():
         # init swarm with first machine
         if leader is None:
             leader = machine
-            print(init_swarm_machine(leader))
+            print(f'Creat initial swarm with leader {leader}')
+            if init_swarm_machine(leader):
+                print('Swarm init successful\n')
         else:
-            print(join_swarm_machine(machine, leader))
+            print(f'Machine {machine} joins swarm of leader {leader}')
+            if (join_swarm_machine(machine, leader)):
+                print('Joining swarm successful\n')
     print(answers)
 
 
