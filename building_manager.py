@@ -9,6 +9,9 @@ CONFIG_DIRS = [
     'influxdb', 'mosquitto', 'nodered', 'ssh', 'treafik', 'volumerize'
 ]
 
+#Default Swarm port
+SWARM_PORT = 2377
+
 
 # ******************************
 # Config file functions {{{
@@ -73,6 +76,55 @@ def get_machine_env(machine_name):
             env_entry = [a.strip('"') for a in assign.split('=', 1)]
             machine_envs[env_entry[0]] = env_entry[1]
     return machine_envs
+
+
+def get_machine_ip(machine_name):
+    """Asks for the ip of the docker machine
+
+    :machine_name: Name of the machine to use for init
+    """
+    from subprocess import run
+    machine_result = run(['docker-machine', 'ip', machine_name],
+                         text=True,
+                         capture_output=True)
+    return machine_result.stdout
+
+
+def init_swarm_machine(machine_name):
+    """Creates a new swarm with the specified machine as leader
+
+    :machine_name: Name of the machine to use for init
+    """
+    from subprocess import run
+    machine_ip = get_machine_ip(machine_name)
+    init_command = 'docker swarm init --advertise-addr ' + machine_ip
+    machine_result = run(['docker-machine', 'ssh', machine_name, init_command],
+                         text=True,
+                         capture_output=True)
+    return machine_result.stdout
+
+
+def join_swarm_machine(machine_name, leader_name):
+    """Joins the swarm of the specified leader
+
+    :machine_name: Name of the machine to join a swarm
+    :leader_name: Name of the swarm leader machine
+    """
+    from subprocess import run
+    token_command = 'docker swarm join-token manager -q'
+    token_result = run(['docker-machine', 'ssh', leader_name, token_command],
+                       text=True,
+                       capture_output=True)
+    token = token_result.stdout
+    leader_ip = get_machine_ip(leader_name)
+
+    join_command = 'docker swarm join --token {} {}{}'.format(
+        token, leader_ip, SWARM_PORT)
+    join_result = run(['docker-machine', 'ssh', machine_name, join_command],
+                      text=True,
+                      capture_output=True)
+
+    return join_result.stdout
 
 
 # }}}
@@ -246,14 +298,29 @@ def init_menu():
             'type': 'checkbox',
             'name': 'machines',
             'message': 'What docker machines will be used?',
-            'choices': [{
-                'name': m
-            } for m in get_machine_list()]
+            'choices': generate_checkbox_choices(get_machine_list())
         },
     ]
     answers = prompt(questions)
 
+    leader = None
+
+    for machine in answers['machines']:
+        # init swarm with first machine
+        if leader is None:
+            leader = machine
+            print(init_swarm_machine(leader))
+        else:
+            print(join_swarm_machine(machine, leader))
     print(answers)
+
+
+def generate_checkbox_choices(list):
+    """Generates checkbox entries for lists of strings
+
+    :returns: A list of dicts with name keys
+    """
+    return [{'name': m} for m in list]
 
 
 # }}}
