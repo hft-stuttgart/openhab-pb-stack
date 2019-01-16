@@ -56,6 +56,20 @@ def copy_template_config(base_dir, config_path):
     copy2(template_path, custom_path)
 
 
+def generate_mosquitto_user_line(username, password):
+    """Generates a line for a mosquitto user with a crypt hashed password
+
+    :username: username to use
+    :password: password that will be hashed (SHA512)
+    :returns: a line as expected by mosquitto
+
+    """
+    import crypt
+    password_hash = crypt.crypt(password, crypt.mksalt(crypt.METHOD_SHA512))
+    line = f"{username}:{password_hash}"
+    return line
+
+
 # }}}
 
 
@@ -314,19 +328,27 @@ def main_menu():
 def init_menu():
     """Menu entry for initial setup and file generation
     """
-    questions = [
-        {
-            'type': 'input',
-            'name': 'stack_name',
-            'message': 'Choose a name for your setup'
-        },
-        {
-            'type': 'checkbox',
-            'name': 'machines',
-            'message': 'What docker machines will be used?',
-            'choices': generate_checkbox_choices(get_machine_list())
-        },
-    ]
+    questions = [{
+        'type': 'input',
+        'name': 'stack_name',
+        'message': 'Choose a name for your setup'
+    },
+                 {
+                     'type': 'checkbox',
+                     'name': 'machines',
+                     'message': 'What docker machines will be used?',
+                     'choices': generate_checkbox_choices(get_machine_list())
+                 },
+                 {
+                     'type': 'input',
+                     'name': 'username',
+                     'message': 'Choose a username for the initial user'
+                 },
+                 {
+                     'type': 'password',
+                     'name': 'password',
+                     'message': 'Choose a password for the initial user'
+                 }]
     answers = prompt(questions)
 
     leader = None
@@ -342,6 +364,10 @@ def init_menu():
             print(f'Machine {machine} joins swarm of leader {leader}')
             if (join_swarm_machine(machine, leader)):
                 print('Joining swarm successful\n')
+
+    user_line = generate_mosquitto_user_line(answers['username'],
+                                             answers['password'])
+    print(user_line)
     print(answers)
 
 
