@@ -83,14 +83,41 @@ The openhab-pb stack consists of multiple configuration files that need to be av
 **mosquitto**
 
 - *mosquitto.conf*: basic configuration of mosquitto
+  - copy from template folder
   - disables anonymous access
   - enables usage of password file
 - *mosquitto_passwords*: List of users/passwords that gain access to mosquitto
   - generated with `mosquitto_passwd`
+  - Uses SHA512 crypt -> maybe generated using pythons crypt library
 
 **nodered**
 
 - *nodered_package.json*: packages to be installed when node red is setup
+  - copy from template folder
   - contains entry for openhab package
-- *nodered_settings*: basic node red config
+- *nodered_settings.js*: basic node red config
+  - copy from template folder
   - contains `httpNodeAuth` for users
+
+**ssh**
+
+- *sshd_config*: basic ssh config
+  - copy from template folder
+- *sftp_users.conf*: file containing users for sftp container
+  - generated, grants access to configuration files
+- *known_hosts*: make backup (volumerize) hosts know internal ssh servers
+  - generated using ssh-keygen
+- *id_rsa/id_rsa.pub*: key pair for passwordless ssh between containers
+  - generated using ssh-keygen
+- *ssh_host_x_key*: hostkey for ssh, X is cryptosystem
+  - generated using ssh-keygen
+
+**traefik**
+
+- *traefik.toml*: basic traefik configuration
+  - copy from template folder 
+  - entryPoints.http.auth.basic contains users generated with htpasswd
+
+**volumerize**
+
+- *backup_config_X.json*: backup/volumerize config for each building, X is replaced by building name

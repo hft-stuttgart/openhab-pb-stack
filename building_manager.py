@@ -13,8 +13,10 @@ logging.basicConfig(level=logging.WARNING)
 # Directories for config generation
 CUSTOM_DIR = 'custom_configs'
 TEMPLATE_DIR = 'template_configs'
-CONFIG_DIRS = [
-    'influxdb', 'mosquitto', 'nodered', 'ssh', 'treafik', 'volumerize'
+CONFIG_DIRS = ['mosquitto', 'nodered', 'ssh', 'traefik', 'volumerize']
+TEMPLATE_FILES = [
+    'mosquitto/mosquitto.conf', 'nodered/nodered_package.json',
+    'nodered/nodered_settings.js', 'ssh/sshd_config', 'traefik/traefik.toml'
 ]
 
 # Default Swarm port
@@ -47,10 +49,11 @@ def copy_template_config(base_dir, config_path):
     :base_dir: path that contains template and custom folders
     :config_path: relative path of config to copy from template
     """
-    custom_path = base_dir + '/' + CUSTOM_DIR
-    template_path = base_dir + '/' + TEMPLATE_DIR
-    print(f'Copy {config_path} from {custom_path to} {template_path}')
-    pass
+    custom_path = base_dir + '/' + CUSTOM_DIR + "/" + config_path
+    template_path = base_dir + '/' + TEMPLATE_DIR + "/" + config_path
+
+    logging.info(f'Copy {config_path} from {custom_path} to {template_path}')
+    copy2(template_path, custom_path)
 
 
 # }}}
@@ -224,7 +227,12 @@ def init_config_dirs_command(args):
     if base_dir is None:
         base_dir = os.getcwd()
 
+    # generate basic config folder
     generate_config_folders(base_dir)
+
+    # copy template configs
+    for template_file in TEMPLATE_FILES:
+        copy_template_config(base_dir, template_file)
 
 
 def assign_building_command(args):
