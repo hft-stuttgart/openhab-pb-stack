@@ -105,6 +105,9 @@ The openhab-pb stack consists of multiple configuration files that need to be av
   - copy from template folder
 - *sftp_users.conf*: file containing users for sftp container
   - generated, grants access to configuration files
+  - uses `makepasswd` to generate MD5 hashed passwords
+    - script uses pythons `crypt` to generate them
+    - as it relies on the Linux password system we can even use stronger hashes like SHA512
 - *known_hosts*: make backup (volumerize) hosts know internal ssh servers
   - generated using ssh-keygen
 - *id_rsa/id_rsa.pub*: key pair for passwordless ssh between containers

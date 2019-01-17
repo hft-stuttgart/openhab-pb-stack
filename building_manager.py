@@ -18,6 +18,10 @@ TEMPLATE_FILES = [
     'mosquitto/mosquitto.conf', 'nodered/nodered_package.json',
     'nodered/nodered_settings.js', 'ssh/sshd_config', 'traefik/traefik.toml'
 ]
+EDIT_FILES = {
+    "mosquitto_passwords": "mosquitto/mosquitto_passwords",
+    "sftp_users": "ssh/sftp_users.conf"
+}
 
 # Default Swarm port
 SWARM_PORT = 2377
@@ -61,13 +65,84 @@ def generate_mosquitto_user_line(username, password):
 
     :username: username to use
     :password: password that will be hashed (SHA512)
-    :returns: a line as expected by mosquitto
 
+    :returns: a line as expected by mosquitto
     """
     import crypt
     password_hash = crypt.crypt(password, crypt.mksalt(crypt.METHOD_SHA512))
     line = f"{username}:{password_hash}"
     return line
+
+
+def generate_sftp_user_line(username, password, directories=None):
+    """Generates a line for a sftp user with a hashed password
+
+    :username: username to use
+    :password: password that will be hashed (MD5)
+    :directories: list of directories which the user should have
+
+    :returns: a line as expected by mosquitto
+    """
+    import crypt
+    # generate user line with hashed password
+    password_hash = crypt.crypt(password, crypt.mksalt(crypt.METHOD_SHA512))
+    line = f"{username}:{password_hash}:e"
+    # add directory entries when available
+    if directories:
+        # create comma separated string from list
+        dir_line = ','.join(d for d in directories)
+        line = f"{line}:{dir_line}"
+    return line
+
+
+def generate_mosquitto_file(base_dir, username, password):
+    """Generates a mosquitto password file using mosquitto_passwd system tool
+
+    :base_dir: path that contains custom config folder
+    :username: username to use
+    :password: password that will be used
+
+    """
+    passwd_path = base_dir + '/' + CUSTOM_DIR + "/" + EDIT_FILES[
+        'mosquitto_passwords']
+
+    # ensure file exists
+    if not os.path.exists(passwd_path):
+        open(passwd_path, 'a').close()
+
+    # execute mosquitto passwd
+    mos_result = run(
+        ['mosquitto_passwd', '-b', passwd_path, username, password],
+        text=True,
+        capture_output=True)
+    return mos_result.returncode == 0
+
+
+def generate_sftp_file(base_dir, username, password, direcories=None):
+    """Generates a mosquitto password file using mosquitto_passwd system tool
+
+    :base_dir: path that contains custom config folder
+    :username: username to use
+    :password: password that will be used
+    :directories: list of directories which the user should have
+
+    """
+    # generate line and save it into a file
+    file_content = generate_sftp_user_line(username, password, direcories)
+    create_or_replace_config_file(base_dir, EDIT_FILES['sftp_users'],
+                                  file_content)
+
+
+def create_or_replace_config_file(base_dir, config_path, content):
+    """Creates or replaces a config file with new content
+
+    :base_dir: path that contains custom config folder
+    :config_path: relative path of config
+    :content: content of the file as a string
+    """
+    custom_path = base_dir + '/' + CUSTOM_DIR + "/" + config_path
+    with open(custom_path, 'w+') as file:
+        file.write(content)
 
 
 # }}}
@@ -296,7 +371,7 @@ def interactive_command(args):
 
     :args: command line arguments
     """
-    print(main_menu())
+    print(main_menu(args))
 
 
 # }}}
@@ -305,7 +380,7 @@ def interactive_command(args):
 # ******************************
 # Interactive menu entries {{{
 # ******************************
-def main_menu():
+def main_menu(args):
     """ Display main menu
     """
     questions = [{
@@ -320,14 +395,21 @@ def main_menu():
     answers = prompt(questions)
 
     if 'Create' in answers['main']:
-        init_menu()
+        init_menu(args)
 
     return answers
 
 
-def init_menu():
+def init_menu(args):
     """Menu entry for initial setup and file generation
     """
+    # Base directory for configs
+    base_dir = args.base_dir
+
+    if base_dir is None:
+        base_dir = os.getcwd()
+
+    # Prompts
     questions = [{
         'type': 'input',
         'name': 'stack_name',
@@ -365,9 +447,10 @@ def init_menu():
             if (join_swarm_machine(machine, leader)):
                 print('Joining swarm successful\n')
 
-    user_line = generate_mosquitto_user_line(answers['username'],
-                                             answers['password'])
-    print(user_line)
+    # Generate config files based on input
+    generate_sftp_file(base_dir, answers['username'], answers['password'])
+    generate_mosquitto_file(base_dir, answers['username'], answers['password'])
+
     print(answers)
 
 
@@ -382,7 +465,7 @@ def generate_checkbox_choices(list):
 # }}}
 
 # ******************************
-# Script main (entry) {{{
+# Script main ( entry) {{{
 # ******************************
 if __name__ == '__main__':
     import argparse
@@ -396,6 +479,10 @@ if __name__ == '__main__':
     parser_interactive = subparsers.add_parser(
         'interactive',
         help='Starts the interactive mode of the building manager')
+    parser_interactive.add_argument(
+        '--base_dir',
+        '-d',
+        help='Directory to creat config folders in, default is current dir')
     parser_interactive.set_defaults(func=interactive_command)
 
     # Restore command
