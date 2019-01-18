@@ -1,4 +1,6 @@
 #!/usr/bin/env python
+import bcrypt
+import crypt
 import docker
 import logging
 import os
@@ -20,7 +22,8 @@ TEMPLATE_FILES = [
 ]
 EDIT_FILES = {
     "mosquitto_passwords": "mosquitto/mosquitto_passwords",
-    "sftp_users": "ssh/sftp_users.conf"
+    "sftp_users": "ssh/sftp_users.conf",
+    "traefik_users": "traefik/traefik_users"
 }
 
 # Default Swarm port
@@ -68,7 +71,6 @@ def generate_mosquitto_user_line(username, password):
 
     :returns: a line as expected by mosquitto
     """
-    import crypt
     password_hash = crypt.crypt(password, crypt.mksalt(crypt.METHOD_SHA512))
     line = f"{username}:{password_hash}"
     return line
@@ -78,12 +80,11 @@ def generate_sftp_user_line(username, password, directories=None):
     """Generates a line for a sftp user with a hashed password
 
     :username: username to use
-    :password: password that will be hashed (MD5)
+    :password: password that will be hashed (SHA512)
     :directories: list of directories which the user should have
 
-    :returns: a line as expected by mosquitto
+    :returns: a line as expected by sshd
     """
-    import crypt
     # generate user line with hashed password
     password_hash = crypt.crypt(password, crypt.mksalt(crypt.METHOD_SHA512))
     line = f"{username}:{password_hash}:e"
@@ -95,13 +96,25 @@ def generate_sftp_user_line(username, password, directories=None):
     return line
 
 
+def generate_traefik_user_line(username, password):
+    """Generates a line for a traefik user with a bcrypt hashed password
+
+    :username: username to use
+    :password: password that will be hashed (bcrypt)
+
+    :returns: a line as expected by traefik
+    """
+    password_hash = bcrypt.hashpw(password.encode(), bcrypt.gensalt())
+    line = f"{username}:{password_hash.decode()}"
+    return line
+
+
 def generate_mosquitto_file(base_dir, username, password):
     """Generates a mosquitto password file using mosquitto_passwd system tool
 
     :base_dir: path that contains custom config folder
     :username: username to use
     :password: password that will be used
-
     """
     passwd_path = base_dir + '/' + CUSTOM_DIR + "/" + EDIT_FILES[
         'mosquitto_passwords']
@@ -119,17 +132,29 @@ def generate_mosquitto_file(base_dir, username, password):
 
 
 def generate_sftp_file(base_dir, username, password, direcories=None):
-    """Generates a mosquitto password file using mosquitto_passwd system tool
+    """Generates a sftp password file
 
     :base_dir: path that contains custom config folder
     :username: username to use
     :password: password that will be used
     :directories: list of directories which the user should have
-
     """
     # generate line and save it into a file
     file_content = generate_sftp_user_line(username, password, direcories)
     create_or_replace_config_file(base_dir, EDIT_FILES['sftp_users'],
+                                  file_content)
+
+
+def generate_traefik_file(base_dir, username, password):
+    """Generates a traefik password file
+
+    :base_dir: path that contains custom config folder
+    :username: username to use
+    :password: password that will be used
+    """
+    # generate line and save it into a file
+    file_content = generate_traefik_user_line(username, password)
+    create_or_replace_config_file(base_dir, EDIT_FILES['traefik_users'],
                                   file_content)
 
 
@@ -450,6 +475,7 @@ def init_menu(args):
     # Generate config files based on input
     generate_sftp_file(base_dir, answers['username'], answers['password'])
     generate_mosquitto_file(base_dir, answers['username'], answers['password'])
+    generate_traefik_file(base_dir, answers['username'], answers['password'])
 
     print(answers)
 
