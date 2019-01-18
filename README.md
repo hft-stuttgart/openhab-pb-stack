@@ -72,9 +72,11 @@ mosquitto (mosquitto_passwd utility)
 docker
 PyInquirer
 pyyaml
+bcrypt
+pip-tools
 ```
 
-All python requirements are installable using `pip install -r requirements.txt` pointing to the requirements.txt file in this repo.
+All python requirements managed using `pip-tool` in the `requirements.in` file. The command `pip-compile`  generates a `requirements.txt` file that  can be used with with `pip install -r requirements.txt`  to install all needed python dependencies, updating the `requirements.txt` file can be done using `pip-compile` again. In an virtual environment `pip-sync` can be used instead of pip install to install needed packages.
 
 ### Config file generation
 
