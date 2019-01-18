@@ -23,7 +23,10 @@ TEMPLATE_FILES = [
 EDIT_FILES = {
     "mosquitto_passwords": "mosquitto/mosquitto_passwords",
     "sftp_users": "ssh/sftp_users.conf",
-    "traefik_users": "traefik/traefik_users"
+    "traefik_users": "traefik/traefik_users",
+    "id_rsa": "ssh/id_rsa",
+    "host_key": "ssh/ssh_host_ed25519_key",
+    "known_hosts": "ssh/known_hosts"
 }
 
 # Default Swarm port
@@ -143,6 +146,55 @@ def generate_sftp_file(base_dir, username, password, direcories=None):
     file_content = generate_sftp_user_line(username, password, direcories)
     create_or_replace_config_file(base_dir, EDIT_FILES['sftp_users'],
                                   file_content)
+
+
+def generate_id_rsa_files(base_dir):
+    """Generates id_rsa and id_rsa.pub private/public keys using ssh-keygen
+
+    :base_dir: path that contains custom config folder
+    """
+    id_path = base_dir + '/' + CUSTOM_DIR + "/" + EDIT_FILES['id_rsa']
+
+    # execute ssh-keygen
+    id_result = run(
+        ['ssh-keygen', '-t', 'rsa', '-b', '4096', '-f', id_path, '-N', ''],
+        text=True,
+        capture_output=True)
+    return id_result.returncode == 0
+
+
+def generate_host_key_files(base_dir, hosts):
+    """Generates ssh host keys and matching known_hosts using ssh-keygen
+
+    :base_dir: path that contains custom config folder
+    """
+    key_path = base_dir + '/' + CUSTOM_DIR + "/" + EDIT_FILES['host_key']
+    # ssh-keygen generates public key with .pub postfix
+    pub_path = key_path + '.pub'
+
+    # execute ssh-keygen
+    id_result = run(['ssh-keygen', '-t', 'ed25519', '-f', key_path, '-N', ''],
+                    text=True,
+                    capture_output=True)
+
+    # read content of public key as known line
+    known_line = ""
+    with open(pub_path, 'r') as pub_file:
+        pub_line = pub_file.readline()
+        split_line = pub_line.split()
+        # delete last list element
+        del split_line[-1]
+        # collect hosts as comma separated string
+        hosts_line = ','.join(h for h in hosts)
+        split_line.insert(0, hosts_line)
+        # collect parts as space separated string
+        known_line = ' '.join(sp for sp in split_line)
+
+    # write new known_line file
+    create_or_replace_config_file(base_dir, EDIT_FILES['known_hosts'],
+                                  known_line)
+
+    return id_result.returncode == 0
 
 
 def generate_traefik_file(base_dir, username, password):
@@ -476,6 +528,8 @@ def init_menu(args):
     generate_sftp_file(base_dir, answers['username'], answers['password'])
     generate_mosquitto_file(base_dir, answers['username'], answers['password'])
     generate_traefik_file(base_dir, answers['username'], answers['password'])
+    generate_id_rsa_files(base_dir)
+    generate_host_key_files(base_dir, ["host1", "host2"])
 
     print(answers)
 

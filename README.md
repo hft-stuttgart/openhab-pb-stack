@@ -99,7 +99,6 @@ The openhab-pb stack consists of multiple configuration files that need to be av
   - contains entry for openhab package
 - *nodered_settings.js*: basic node red config
   - copy from template folder
-  - contains `httpNodeAuth` for users
 
 **ssh**
 
