@@ -30,8 +30,10 @@ configs:
         file: ./configs/ssh/id_rsa
     sftp_known_hosts:
         file: ./configs/ssh/known_hosts
-    traefik_proxy:
+    traefik_config:
         file: ./configs/traefik/traefik.toml
+    traefik_users:
+        file: ./configs/traefik/traefik_users
     nodered_settings:
         file: ./configs/nodered/nodered_settings.js
     nodered_package:
@@ -382,8 +384,10 @@ services:
         networks:
             - habnet
         configs:
-            - source: traefik_proxy
+            - source: traefik_config
               target: /etc/traefik/traefik.toml
+            - source: traefik_users
+              target: /etc/traefik/traefik_users
         deploy:
             mode: global
             placement:

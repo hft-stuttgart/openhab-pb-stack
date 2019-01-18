@@ -30,7 +30,8 @@ defaultEntryPoints = ["http"]
     [entryPoints.http]
     address = ":80"
     [entryPoints.http.auth.basic]
-    users = ["ohuser:$apr1$ffMQdoZd$1uEyKkwOKH3QS9ovOAzYj1"]
+    usersFile = "/etc/traefik/traefik_users"
+    #users = ["ohuser:$1$A0mm9w.i$2tr8KLucsPlN6rhhdVDpw0"]
 
 
 # [retry]

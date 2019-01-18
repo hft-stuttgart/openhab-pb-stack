@@ -121,7 +121,9 @@ The openhab-pb stack consists of multiple configuration files that need to be av
 
 - *traefik.toml*: basic traefik configuration
   - copy from template folder 
-  - entryPoints.http.auth.basic contains users generated with htpasswd
+  - entryPoints.http.auth.basic contains usersFile that describes the path to a htpasswd file
+- *traefik_users*: htpasswd style file that contains users and hashed passwords
+  - generated
 
 **volumerize**
 
