@@ -47,10 +47,15 @@ def generate_config_folders(base_dir):
 
     print(f'Initialize configuration in {base_path}')
 
+    # generate empty config dirs
     for d in CONFIG_DIRS:
         new_dir = base_path + '/' + d
         if not os.path.exists(new_dir):
             os.makedirs(new_dir)
+
+    # copy template configs
+    for template_file in TEMPLATE_FILES:
+        copy_template_config(base_dir, template_file)
 
 
 def copy_template_config(base_dir, config_path):
@@ -396,10 +401,6 @@ def init_config_dirs_command(args):
     # generate basic config folder
     generate_config_folders(base_dir)
 
-    # copy template configs
-    for template_file in TEMPLATE_FILES:
-        copy_template_config(base_dir, template_file)
-
 
 def assign_building_command(args):
     """Assigns the role of a building to a node
@@ -446,7 +447,7 @@ def restore_command(args):
 def interactive_command(args):
     """Top level function to start the interactive mode
 
-    :args: command line arguments
+    :args: parsed command line arguments
     """
     print(main_menu(args))
 
@@ -524,6 +525,8 @@ def init_menu(args):
             if (join_swarm_machine(machine, leader)):
                 print('Joining swarm successful\n')
 
+    # Initialize custom configuration dirs and templates
+    generate_config_folders(base_dir)
     # Generate config files based on input
     generate_sftp_file(base_dir, answers['username'], answers['password'])
     generate_mosquitto_file(base_dir, answers['username'], answers['password'])
@@ -553,16 +556,16 @@ if __name__ == '__main__':
         prog='building_manger',
         description='Generate and manage multi'
         'building configurations of openHAB with docker swarm')
+    parser.add_argument(
+        '--base_dir',
+        '-d',
+        help='Directory to creat config folders in, default is current dir')
     subparsers = parser.add_subparsers()
 
     # Interactive mode
     parser_interactive = subparsers.add_parser(
         'interactive',
         help='Starts the interactive mode of the building manager')
-    parser_interactive.add_argument(
-        '--base_dir',
-        '-d',
-        help='Directory to creat config folders in, default is current dir')
     parser_interactive.set_defaults(func=interactive_command)
 
     # Restore command
@@ -603,14 +606,16 @@ if __name__ == '__main__':
     # - Config init
     parser_config_init = parser_config_subs.add_parser(
         'init', help='Initialize config file directories')
-    parser_config_init.add_argument(
-        '--base_dir',
-        '-d',
-        help='Directory to creat config folders in, default is current dir')
     parser_config_init.set_defaults(func=init_config_dirs_command)
 
+    # Parse arguments into args dict
     args = parser.parse_args()
-    args.func(args)
+
+    # when no subcommand is defined show interactive menu
+    try:
+        args.func(args)
+    except AttributeError:
+        interactive_command(args)
 # }}}
 
 # --- vim settings ---
