@@ -3,6 +3,7 @@
   "description": "A Node-RED Project",
   "version": "0.1.0",
   "dependencies": {
-    "node-red-contrib-openhab2": "~1.1.3"
+    "node-red-contrib-openhab2": "~1.1.4",
+    "node-red-contrib-openhab-v2": "~1.4.0"
   }
 }
