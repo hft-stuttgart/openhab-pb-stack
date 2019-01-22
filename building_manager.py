@@ -176,6 +176,8 @@ def generate_host_key_files(base_dir, hosts):
     key_path = base_dir + '/' + CUSTOM_DIR + "/" + EDIT_FILES['host_key']
     # ssh-keygen generates public key with .pub postfix
     pub_path = key_path + '.pub'
+    # host_names with sftp_ postfix
+    sftp_hosts = [f'sftp_{host}' for host in hosts]
 
     # execute ssh-keygen
     id_result = run(['ssh-keygen', '-t', 'ed25519', '-f', key_path, '-N', ''],
@@ -189,8 +191,8 @@ def generate_host_key_files(base_dir, hosts):
         split_line = pub_line.split()
         # delete last list element
         del split_line[-1]
-        # collect hosts as comma separated string
-        hosts_line = ','.join(h for h in hosts)
+        # collect sftp hosts as comma separated string
+        hosts_line = ','.join(h for h in sftp_hosts)
         split_line.insert(0, hosts_line)
         # collect parts as space separated string
         known_line = ' '.join(sp for sp in split_line)
@@ -325,6 +327,23 @@ def join_swarm_machine(machine_name, leader_name):
     return join_result.returncode == 0
 
 
+def generate_swarm(machines):
+    """Generates a swarm, the first machine will be the initial leader
+
+    :machines: list of machines in the swarm
+    """
+    leader = None
+    for machine in 'machines':
+        # init swarm with first machine
+        if leader is None:
+            leader = machine
+            print(f'Create initial swarm with leader {leader}')
+            if init_swarm_machine(leader):
+                print('Swarm init successful\n')
+        else:
+            print(f'Machine {machine} joins swarm of leader {leader}')
+            if (join_swarm_machine(machine, leader)):
+                print('Joining swarm successful\n')
 # }}}
 
 
@@ -461,14 +480,18 @@ def interactive_command(args):
 def main_menu(args):
     """ Display main menu
     """
+    # Base directory for configs
+    base_dir = args.base_dir
+
+    if base_dir is None:
+        base_dir = os.getcwd()
+
+    # Main menu prompts
     questions = [{
-        'type':
-        'list',
-        'name':
-        'main',
-        'message':
-        'Public Building Manager - Main Menu',
-        'choices': ['Create initial structure', 'Execute command', 'Exit']
+        'type': 'list',
+        'name': 'main',
+        'message': 'Public Building Manager - Main Menu',
+        'choices': load_main_entires(base_dir)
     }]
     answers = prompt(questions)
 
@@ -493,48 +516,83 @@ def init_menu(args):
         'name': 'stack_name',
         'message': 'Choose a name for your setup'
     },
-                 {
-                     'type': 'checkbox',
-                     'name': 'machines',
-                     'message': 'What docker machines will be used?',
-                     'choices': generate_checkbox_choices(get_machine_list())
-                 },
-                 {
-                     'type': 'input',
-                     'name': 'username',
-                     'message': 'Choose a username for the initial user'
-                 },
-                 {
-                     'type': 'password',
-                     'name': 'password',
-                     'message': 'Choose a password for the initial user'
-                 }]
+        {
+        'type': 'checkbox',
+        'name': 'machines',
+        'message': 'What docker machines will be used?',
+        'choices': generate_checkbox_choices(get_machine_list())
+    },
+        {
+        'type': 'input',
+        'name': 'username',
+        'message': 'Choose a username for the admin user'
+    }]
     answers = prompt(questions)
 
-    leader = None
-
-    for machine in answers['machines']:
-        # init swarm with first machine
-        if leader is None:
-            leader = machine
-            print(f'Create initial swarm with leader {leader}')
-            if init_swarm_machine(leader):
-                print('Swarm init successful\n')
+    # Ensure passwords match
+    password_match = False
+    while not password_match:
+        password_questions = [{
+            'type': 'password',
+            'name': 'password',
+            'message': 'Choose a password for the admin user:',
+        },
+            {
+            'type': 'password',
+            'name': 'confirm',
+            'message': 'Repeat password for the admin user',
+        }]
+        password_answers = prompt(password_questions)
+        if password_answers['password'] == password_answers['confirm']:
+            password_match = True
         else:
-            print(f'Machine {machine} joins swarm of leader {leader}')
-            if (join_swarm_machine(machine, leader)):
-                print('Joining swarm successful\n')
+            print("Passwords did not match, try again")
 
     # Initialize custom configuration dirs and templates
     generate_config_folders(base_dir)
     # Generate config files based on input
-    generate_sftp_file(base_dir, answers['username'], answers['password'])
-    generate_mosquitto_file(base_dir, answers['username'], answers['password'])
-    generate_traefik_file(base_dir, answers['username'], answers['password'])
+    username = answers['username']
+    password = password_answers['password']
+    hosts = answers['machines']
+    generate_sftp_file(base_dir, username, password)
+    generate_mosquitto_file(base_dir, username, password)
+    generate_traefik_file(base_dir, username, password)
     generate_id_rsa_files(base_dir)
-    generate_host_key_files(base_dir, ["host1", "host2"])
+    generate_host_key_files(base_dir, hosts)
 
-    print(answers)
+    # print(answers)
+    print(f"Configuration files generated in {base_dir}")
+
+    # Check if changes shall be applied to docker environment
+    generate_questions = [{
+        'type': 'confirm',
+        'name': 'generate',
+        'message': 'Apply changes to docker environment?',
+        'default': True
+    }]
+    generate_answers = prompt(generate_questions)
+
+    if generate_answers['generate']:
+        generate_swarm(answers['machines'])
+
+
+def load_main_entires(base_dir):
+    """Loads entries for main menu depending on available files
+
+    :base_dir: directory of configuration files
+    :returns: entries of main menu
+    """
+    custom_path = base_dir + '/' + CUSTOM_DIR
+
+    entries = []
+    if not os.path.exists(custom_path):
+        entries.append('Create initial structure')
+    else:
+        entries.append('Execute command')
+
+    entries.append('Exit')
+
+    return entries
 
 
 def generate_checkbox_choices(list):
