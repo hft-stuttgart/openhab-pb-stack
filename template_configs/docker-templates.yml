@@ -1,0 +1,199 @@
+version: "3.3"
+
+networks:
+    habnet:
+        driver: overlay
+        attachable: true
+
+configs:
+    backup_config_X:
+        file: ./volumerize/backup_config_X.json
+    sftp_config:
+        file: ./ssh/sshd_config
+    sftp_users:
+        file: ./ssh/sftp_users.conf
+    sftp_key_ed:
+        file: ./ssh/ssh_host_ed25519_key
+    sftp_id_pub:
+        file: ./ssh/id_rsa.pub
+    sftp_id_key:
+        file: ./ssh/id_rsa
+    sftp_known_hosts:
+        file: ./ssh/known_hosts
+    traefik_config:
+        file: ./traefik/traefik.toml
+    traefik_users:
+        file: ./traefik/traefik_users
+    nodered_settings:
+        file: ./nodered/nodered_settings.js
+    nodered_package:
+        file: ./nodered/nodered_package.json
+    mosquitto_passwords:
+        file: ./mosquitto/mosquitto_passwords
+    mosquitto_settings:
+        file: ./mosquitto/mosquitto.conf
+
+volumes:
+    openhab_addons:
+    openhab_conf:
+    openhab_userdata:
+    nodered_data:
+    mosquitto_data:
+    influxdb_data:
+    backup_data:
+    backup_cache:
+
+services:
+    backup_X:
+        image: blacklabelops/volumerize
+        volumes:
+            - "openhab_userdata:/source/openhab_userdata"
+            - "openhab_conf:/source/openhab_conf"
+            - "openhab_addons:/source/openhab_addons"
+            - "nodered_data:/source/nodered_data"
+            - "influxdb_data:/source/influxdb_data"
+            - "backup_cache:/volumerize-cache"
+            - "backup_data:/backup"
+        configs:
+            - source: backup_config_X
+              target: /backup_config.json
+            - source: sftp_id_key
+              target: /root/.ssh/id_rsa
+              mode: 0400
+            - source: sftp_known_hosts
+              target: /root/.ssh/known_hosts
+              mode: 0400
+        environment:
+            - VOLUMERIZE_SOURCE=/source
+            - VOLUMERIZE_TARGET='multi:///backup_config.json?mode=mirror&onfail=abort'
+            - VOLUMERIZE_DUPLICITY_OPTIONS=--ssh-options "-oStrictHostKeyChecking=no"
+        networks:
+            - habnet
+        deploy:
+            placement:
+                constraints:
+                    - node.labels.building == X
+    sftp_X:
+        image: "atmoz/sftp"
+        volumes:
+            - "openhab_userdata:/home/ohadmin/openhab_userdata"
+            - "openhab_conf:/home/ohadmin/openhab_conf"
+            - "nodered_data:/home/ohadmin/nodered_data"
+            - "backup_data:/home/ohadmin/backup_data"
+        configs:
+            - source: sftp_config
+              target: /etc/ssh/sshd_config
+            - source: sftp_users
+              target: /etc/sftp/users.conf
+            - source: sftp_key_ed
+              target: /etc/ssh/ssh_host_ed25519_key
+              mode: 0400
+            - source: sftp_id_key
+              target: /home/ohadmin/.ssh/id_rsa
+              uid: '9001'
+              mode: 0400
+            - source: sftp_id_pub
+              target: /home/ohadmin/.ssh/keys/sync.pub
+        networks:
+            - habnet
+        deploy:
+            placement:
+                constraints:
+                    - node.labels.building == X
+    openhab_X:
+        image: "openhab/openhab:2.4.0-amd64-debian"
+        volumes:
+            - "/etc/localtime:/etc/localtime:ro"
+            - "/etc/timezone:/etc/timezone:ro"
+            - "openhab_addons:/openhab/addons"
+            - "openhab_conf:/openhab/conf"
+            - "openhab_userdata:/openhab/userdata"
+        environment:
+            OPENHAB_HTTP_PORT: "8181"
+            OPENHAB_HTTPS_PORT: "8443"
+        networks:
+            - habnet
+        deploy:
+            labels:
+                - "traefik.docker.network=ohpb_habnet"
+                - "traefik.port=8181"
+            placement:
+                constraints:
+                    - node.labels.building == X
+    nodered_X:
+        image: "nodered/node-red-docker"
+        volumes:
+            - "nodered_data:/data"
+        networks:
+            - habnet
+        configs:
+            - source: nodered_package
+              target: /data/package.json
+            - source: nodered_settings
+              target: /data/settings.js
+        deploy:
+            labels:
+                - "traefik.port=1880"
+                - "traefik.docker.network=ohpb_habnet"
+            placement:
+                constraints:
+                    - node.labels.building == X
+    mqtt_X:
+        image: "eclipse-mosquitto"
+        volumes:
+            - "mosquitto_data:/mosquitto/data"
+        ports:
+        configs:
+            - source: mosquitto_passwords
+              target: /mosquitto/config/passwd
+            - source: mosquitto_settings
+              target: /mosquitto/config/mosquitto.conf
+        networks:
+            - habnet
+        deploy:
+            placement:
+                constraints:
+                    - node.labels.building == X
+    db_X:
+        image: "influxdb"
+        volumes:
+            - "influxdb_data:/var/lib/influxdb"
+        configs:
+            - source: influx_init
+              target: /init-influxdb.sh
+              mode: 0555
+            - source: influx_user
+              target: /run/secrets/influx_user
+        environment:
+            INFLUXDB_HTTP_AUTH_ENABLED: "true"
+            INFLUXDB_DB: "openhab"
+            INFLUXDB_ADMIN_USER: "ohadmin"
+            INFLUXDB_ADMIN_PASSWORD: "ohadmin"
+            INFLUXDB_USER: "ohadmin"
+            INFLUXDB_USER_PASSWORD: "ohtest"
+        networks:
+            - habnet
+        deploy:
+            placement:
+                constraints:
+                    - node.labels.building == X
+    proxy:
+        image: "traefik"
+        command: --api --docker --docker.swarmMode --logLevel="DEBUG"
+        volumes:
+            - "/var/run/docker.sock:/var/run/docker.sock"
+        ports:
+            - "8080:8080"
+            - "80:80"
+        networks:
+            - habnet
+        configs:
+            - source: traefik_config
+              target: /etc/traefik/traefik.toml
+            - source: traefik_users
+              target: /etc/traefik/traefik_users
+        deploy:
+            mode: global
+            placement:
+                constraints:
+                    - node.role == manager

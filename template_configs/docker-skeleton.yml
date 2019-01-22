@@ -1,0 +1,67 @@
+version: "3.3"
+
+networks:
+    habnet:
+        driver: overlay
+        attachable: true
+        
+configs:
+    backup_config:
+        file: ./volumerize/backup_config.json
+    sftp_config:
+        file: ./ssh/sshd_config
+    sftp_users:
+        file: ./ssh/sftp_users.conf
+    sftp_key_ed:
+        file: ./ssh/ssh_host_ed25519_key
+    sftp_id_pub:
+        file: ./ssh/id_rsa.pub
+    sftp_id_key:
+        file: ./ssh/id_rsa
+    sftp_known_hosts:
+        file: ./ssh/known_hosts
+    traefik_config:
+        file: ./traefik/traefik.toml
+    traefik_users:
+        file: ./traefik/traefik_users
+    nodered_settings:
+        file: ./nodered/nodered_settings.js
+    nodered_package:
+        file: ./nodered/nodered_package.json
+    mosquitto_passwords:
+        file: ./mosquitto/mosquitto_passwords
+    mosquitto_settings:
+        file: ./mosquitto/mosquitto.conf
+
+volumes:
+    openhab_addons:
+    openhab_conf:
+    openhab_userdata:
+    nodered_data:
+    mosquitto_data:
+    influxdb_data:
+    unison_data:
+    backup_data:
+    backup_cache:
+    
+services:
+    proxy:
+        image: "traefik"
+        command: --api --docker --docker.swarmMode --logLevel="DEBUG"
+        volumes:
+            - "/var/run/docker.sock:/var/run/docker.sock"
+        ports:
+            - "8080:8080"
+            - "80:80"
+        networks:
+            - habnet
+        configs:
+            - source: traefik_config
+              target: /etc/traefik/traefik.toml
+            - source: traefik_users
+              target: /etc/traefik/traefik_users
+        deploy:
+            mode: global
+            placement:
+                constraints:
+                    - node.role == manager

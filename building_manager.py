@@ -4,10 +4,16 @@ import crypt
 import docker
 import logging
 import os
+# import yaml
 
 from shutil import copy2
 from subprocess import run
 from PyInquirer import prompt
+from ruamel.yaml import YAML
+
+# Configure YAML
+yaml = YAML()
+yaml.indent(mapping=4, sequence=4, offset=2)
 
 # Log level during development is info
 logging.basicConfig(level=logging.WARNING)
@@ -15,6 +21,9 @@ logging.basicConfig(level=logging.WARNING)
 # Directories for config generation
 CUSTOM_DIR = 'custom_configs'
 TEMPLATE_DIR = 'template_configs'
+COMPOSE_NAME = 'docker-stack.yml'
+SKELETON_NAME = 'docker-skeleton.yml'
+TEMPLATES_NAME = 'docker-templates.yml'
 CONFIG_DIRS = ['mosquitto', 'nodered', 'ssh', 'traefik', 'volumerize']
 TEMPLATE_FILES = [
     'mosquitto/mosquitto.conf', 'nodered/nodered_package.json',
@@ -26,11 +35,192 @@ EDIT_FILES = {
     "traefik_users": "traefik/traefik_users",
     "id_rsa": "ssh/id_rsa",
     "host_key": "ssh/ssh_host_ed25519_key",
-    "known_hosts": "ssh/known_hosts"
+    "known_hosts": "ssh/known_hosts",
+    "backup_config": "volumerize/backup_config.json"
+}
+CONSTRAINTS = {
+    "building": "node.labels.building"
+}
+SERVICES = {
+    "sftp": "sftp_X",
+    "openhab": "openhab_X",
+    "nodered": "nodered_X",
+    "mqtt": "mqtt_X"
 }
 
 # Default Swarm port
 SWARM_PORT = 2377
+# UID for admin
+UID = 9001
+
+# ******************************
+# Compose file functions {{{
+# ******************************
+
+
+def generate_initial_compose(base_dir):
+    """Creates the initial compose using the skeleton
+
+    :base_dir: Folder to place configuration files into
+    """
+    base_path = base_dir + '/' + CUSTOM_DIR
+    template_path = base_dir + '/' + TEMPLATE_DIR
+    # compose file
+    compose = base_path + '/' + COMPOSE_NAME
+    # skeleton file
+    skeleton = template_path + '/' + SKELETON_NAME
+
+    with open(skeleton, 'r') as skeleton_f, open(compose, 'w+') as compose_f:
+        init_content = yaml.load(skeleton_f)
+        yaml.dump(init_content, compose_f)
+
+
+def add_sftp_service(base_dir, hostname, number=0):
+    """Generates an sftp entry and adds it to the compose file
+
+    :base_dir: base directory for configuration files
+    :hostname: names of host that the services is added to
+    :number: increment of exposed port to prevent overlaps
+    """
+    base_path = base_dir + '/' + CUSTOM_DIR
+    # compose file
+    compose_path = base_path + '/' + COMPOSE_NAME
+    # template
+    template = get_service_template(base_dir, SERVICES['sftp'])
+    # service name
+    service_name = f'sftp_{hostname}'
+
+    with open(compose_path, 'r+') as compose_f:
+        # load compose file
+        compose = yaml.load(compose_f)
+        # only label contraint is building
+        template['deploy']['placement']['constraints'][0] = (
+            f"{CONSTRAINTS['building']} == {hostname}")
+        template['ports'] = [f'{2222 + number}:22']
+        compose['services'][service_name] = template
+        # write content starting from first line
+        compose_f.seek(0)
+        # write new compose content
+        yaml.dump(compose, compose_f)
+        # reduce file to new size
+        compose_f.truncate()
+
+
+def add_openhab_service(base_dir, hostname):
+    """Generates an openhab entry and adds it to the compose file
+
+    :base_dir: base directory for configuration files
+    :hostname: names of host that the services is added to
+    """
+    base_path = base_dir + '/' + CUSTOM_DIR
+    # compose file
+    compose_path = base_path + '/' + COMPOSE_NAME
+    # template
+    template = get_service_template(base_dir, SERVICES['openhab'])
+    # service name
+    service_name = f'openhab_{hostname}'
+
+    with open(compose_path, 'r+') as compose_f:
+        # load compose file
+        compose = yaml.load(compose_f)
+        # only label contraint is building
+        template['deploy']['placement']['constraints'][0] = (
+            f"{CONSTRAINTS['building']} == {hostname}")
+        template['deploy']['labels'].append(f'traefik.backend={service_name}')
+        template['deploy']['labels'].append(f'backup={hostname}')
+        template['deploy']['labels'].append(
+            f'traefik.frontend.rule=HostRegexp:'
+            f'{hostname}.{{domain:[a-zA-z0-9-]+}}')
+        compose['services'][service_name] = template
+        # write content starting from first line
+        compose_f.seek(0)
+        # write new compose content
+        yaml.dump(compose, compose_f)
+        # reduce file to new size
+        compose_f.truncate()
+
+
+def add_nodered_service(base_dir, hostname):
+    """Generates an nodered entry and adds it to the compose file
+
+    :base_dir: base directory for configuration files
+    :hostname: names of host that the services is added to
+    """
+    base_path = base_dir + '/' + CUSTOM_DIR
+    # compose file
+    compose_path = base_path + '/' + COMPOSE_NAME
+    # template
+    template = get_service_template(base_dir, SERVICES['nodered'])
+    # service name
+    service_name = f'nodered_{hostname}'
+
+    with open(compose_path, 'r+') as compose_f:
+        # load compose file
+        compose = yaml.load(compose_f)
+        # only label contraint is building
+        template['deploy']['placement']['constraints'][0] = (
+            f"{CONSTRAINTS['building']} == {hostname}")
+        template['deploy']['labels'].append(f'traefik.backend={service_name}')
+        template['deploy']['labels'].append(f'backup={hostname}')
+        template['deploy']['labels'].append(
+            f'traefik.frontend.rule=HostRegexp:'
+            f'{service_name}.{{domain:[a-zA-z0-9-]+}}')
+        compose['services'][service_name] = template
+        # write content starting from first line
+        compose_f.seek(0)
+        # write new compose content
+        yaml.dump(compose, compose_f)
+        # reduce file to new size
+        compose_f.truncate()
+
+
+def add_mqtt_service(base_dir, hostname, number=0):
+    """Generates an mqtt entry and adds it to the compose file
+
+    :base_dir: base directory for configuration files
+    :hostname: names of host that the services is added to
+    :number: increment of exposed port to prevent overlaps
+    """
+    base_path = base_dir + '/' + CUSTOM_DIR
+    # compose file
+    compose_path = base_path + '/' + COMPOSE_NAME
+    # template
+    template = get_service_template(base_dir, SERVICES['mqtt'])
+    # service name
+    service_name = f'mqtt_{hostname}'
+
+    with open(compose_path, 'r+') as compose_f:
+        # load compose file
+        compose = yaml.load(compose_f)
+        # only label contraint is building
+        template['deploy']['placement']['constraints'][0] = (
+            f"{CONSTRAINTS['building']} == {hostname}")
+        # ports incremented by number of services
+        template['ports'] = [f'{1883 + number}:1883', f'{9001 + number}:9001']
+        # write template as service
+        compose['services'][service_name] = template
+        # write content starting from first line
+        compose_f.seek(0)
+        # write new compose content
+        yaml.dump(compose, compose_f)
+        # reduce file to new size
+        compose_f.truncate()
+
+
+def get_service_template(base_dir, service_name):
+    """Gets a service template entry from the template yaml
+
+    :return: yaml entry of a service
+    """
+    template_path = base_dir + '/' + TEMPLATE_DIR
+    templates = template_path + '/' + TEMPLATES_NAME
+
+    with open(templates, 'r') as templates_file:
+        template_content = yaml.load(templates_file)
+
+    return template_content['services'][service_name]
+
+# }}}
 
 
 # ******************************
@@ -95,7 +285,7 @@ def generate_sftp_user_line(username, password, directories=None):
     """
     # generate user line with hashed password
     password_hash = crypt.crypt(password, crypt.mksalt(crypt.METHOD_SHA512))
-    line = f"{username}:{password_hash}:e"
+    line = f"{username}:{password_hash}:e:{UID}:{UID}"
     # add directory entries when available
     if directories:
         # create comma separated string from list
@@ -217,7 +407,26 @@ def generate_traefik_file(base_dir, username, password):
                                   file_content)
 
 
-def create_or_replace_config_file(base_dir, config_path, content):
+def generate_volumerize_file(base_dir, hosts):
+    """Generates config for volumerize backups
+
+    :base_dir: path that contains custom config folder
+    :hosts: names of backup hosts
+    """
+    configs = []
+
+    for h in hosts:
+        host_config = {
+            'description': f'Backup Server on {h}',
+            'url': f'sftp://ohadmin@sftp_{h}://home/ohadmin/backup_data/{h}'
+        }
+        configs.append(host_config)
+
+    create_or_replace_config_file(
+        base_dir, EDIT_FILES['backup_config'], configs, json=True)
+
+
+def create_or_replace_config_file(base_dir, config_path, content, json=False):
     """Creates or replaces a config file with new content
 
     :base_dir: path that contains custom config folder
@@ -226,7 +435,11 @@ def create_or_replace_config_file(base_dir, config_path, content):
     """
     custom_path = base_dir + '/' + CUSTOM_DIR + "/" + config_path
     with open(custom_path, 'w+') as file:
-        file.write(content)
+        if json:
+            import json
+            json.dump(content, file, indent=2)
+        else:
+            file.write(content)
 
 
 # }}}
@@ -333,7 +546,7 @@ def generate_swarm(machines):
     :machines: list of machines in the swarm
     """
     leader = None
-    for machine in 'machines':
+    for machine in machines:
         # init swarm with first machine
         if leader is None:
             leader = machine
@@ -550,6 +763,7 @@ def init_menu(args):
 
     # Initialize custom configuration dirs and templates
     generate_config_folders(base_dir)
+    generate_initial_compose(base_dir)
     # Generate config files based on input
     username = answers['username']
     password = password_answers['password']
@@ -557,8 +771,15 @@ def init_menu(args):
     generate_sftp_file(base_dir, username, password)
     generate_mosquitto_file(base_dir, username, password)
     generate_traefik_file(base_dir, username, password)
+    generate_volumerize_file(base_dir, hosts)
     generate_id_rsa_files(base_dir)
     generate_host_key_files(base_dir, hosts)
+
+    for i, host in enumerate(hosts):
+        add_sftp_service(base_dir, host, i)
+        add_openhab_service(base_dir, host)
+        add_nodered_service(base_dir, host)
+        add_mqtt_service(base_dir, host, i)
 
     # print(answers)
     print(f"Configuration files generated in {base_dir}")

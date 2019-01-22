@@ -18,6 +18,7 @@ pyinquirer==1.0.3
 pyyaml==3.13
 regex==2018.11.22         # via pyinquirer
 requests==2.20.1          # via docker
+ruamel.yaml==0.15.86
 six==1.11.0               # via bcrypt, docker, docker-pycreds, prompt-toolkit, websocket-client
 urllib3==1.24.1           # via requests
 wcwidth==0.1.7            # via prompt-toolkit
