@@ -7,7 +7,7 @@ import os
 # import yaml
 
 from shutil import copy2
-from subprocess import run
+from subprocess import run, PIPE
 from PyInquirer import prompt
 from ruamel.yaml import YAML
 
@@ -325,8 +325,7 @@ def generate_mosquitto_file(base_dir, username, password):
     # execute mosquitto passwd
     mos_result = run(
         ['mosquitto_passwd', '-b', passwd_path, username, password],
-        text=True,
-        capture_output=True)
+        universal_newlines=True)
     return mos_result.returncode == 0
 
 
@@ -354,8 +353,7 @@ def generate_id_rsa_files(base_dir):
     # execute ssh-keygen
     id_result = run(
         ['ssh-keygen', '-t', 'rsa', '-b', '4096', '-f', id_path, '-N', ''],
-        text=True,
-        capture_output=True)
+        universal_newlines=True)
     return id_result.returncode == 0
 
 
@@ -372,8 +370,7 @@ def generate_host_key_files(base_dir, hosts):
 
     # execute ssh-keygen
     id_result = run(['ssh-keygen', '-t', 'ed25519', '-f', key_path, '-N', ''],
-                    text=True,
-                    capture_output=True)
+                    universal_newlines=True)
 
     # read content of public key as known line
     known_line = ""
@@ -455,8 +452,8 @@ def get_machine_list():
     :returns: a list of machine names managed by docker-machine
     """
     machine_result = run(['docker-machine', 'ls', '-q'],
-                         text=True,
-                         capture_output=True)
+                         universal_newlines=True,
+                         stdout=PIPE)
     return machine_result.stdout.splitlines()
 
 
@@ -478,8 +475,8 @@ def get_machine_env(machine_name):
     :returns: Dict of env variables for this machine
     """
     env_result = run(['docker-machine', 'env', machine_name],
-                     text=True,
-                     capture_output=True)
+                     universal_newlines=True,
+                     stdout=PIPE)
 
     machine_envs = {}
 
@@ -498,8 +495,8 @@ def get_machine_ip(machine_name):
     :machine_name: Name of the machine to use for init
     """
     machine_result = run(['docker-machine', 'ip', machine_name],
-                         text=True,
-                         capture_output=True)
+                         universal_newlines=True,
+                         stdout=PIPE)
     return machine_result.stdout.strip()
 
 
@@ -512,8 +509,7 @@ def init_swarm_machine(machine_name):
     machine_ip = get_machine_ip(machine_name)
     init_command = 'docker swarm init --advertise-addr ' + machine_ip
     init_result = run(['docker-machine', 'ssh', machine_name, init_command],
-                      text=True,
-                      capture_output=True)
+                      universal_newlines=True)
     return init_result.returncode == 0
 
 
@@ -526,8 +522,8 @@ def join_swarm_machine(machine_name, leader_name):
     """
     token_command = 'docker swarm join-token manager -q'
     token_result = run(['docker-machine', 'ssh', leader_name, token_command],
-                       text=True,
-                       capture_output=True)
+                       universal_newlines=True,
+                       stdout=PIPE)
     token = token_result.stdout.strip()
     leader_ip = get_machine_ip(leader_name)
     logging.info(f"Swarm leader with ip {leader_ip} uses token {token}")
@@ -535,8 +531,7 @@ def join_swarm_machine(machine_name, leader_name):
     join_cmd = f'docker swarm join --token {token} {leader_ip}:{SWARM_PORT}'
     logging.info(f'Machine {machine_name} joins using command {join_cmd}')
     join_result = run(['docker-machine', 'ssh', machine_name, join_cmd],
-                      text=True,
-                      capture_output=True)
+                      universal_newlines=True)
 
     return join_result.returncode == 0
 
