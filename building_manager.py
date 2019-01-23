@@ -38,9 +38,7 @@ EDIT_FILES = {
     "known_hosts": "ssh/known_hosts",
     "backup_config": "volumerize/backup_config.json"
 }
-CONSTRAINTS = {
-    "building": "node.labels.building"
-}
+CONSTRAINTS = {"building": "node.labels.building"}
 SERVICES = {
     "sftp": "sftp_X",
     "openhab": "openhab_X",
@@ -52,6 +50,8 @@ SERVICES = {
 SWARM_PORT = 2377
 # UID for admin
 UID = 9001
+# Username for admin
+ADMIN_USER = 'ohadmin'
 
 # ******************************
 # Compose file functions {{{
@@ -219,6 +219,7 @@ def get_service_template(base_dir, service_name):
         template_content = yaml.load(templates_file)
 
     return template_content['services'][service_name]
+
 
 # }}}
 
@@ -557,6 +558,8 @@ def generate_swarm(machines):
             print(f'Machine {machine} joins swarm of leader {leader}')
             if (join_swarm_machine(machine, leader)):
                 print('Joining swarm successful\n')
+
+
 # }}}
 
 
@@ -681,7 +684,7 @@ def interactive_command(args):
 
     :args: parsed command line arguments
     """
-    print(main_menu(args))
+    main_menu(args)
 
 
 # }}}
@@ -724,36 +727,44 @@ def init_menu(args):
         base_dir = os.getcwd()
 
     # Prompts
-    questions = [{
-        'type': 'input',
-        'name': 'stack_name',
-        'message': 'Choose a name for your setup'
-    },
+    questions = [
         {
-        'type': 'checkbox',
-        'name': 'machines',
-        'message': 'What docker machines will be used?',
-        'choices': generate_checkbox_choices(get_machine_list())
-    },
+            'type': 'input',
+            'name': 'stack_name',
+            'message': 'Choose a name for your setup'
+        },
         {
-        'type': 'input',
-        'name': 'username',
-        'message': 'Choose a username for the admin user'
-    }]
+            'type': 'checkbox',
+            'name': 'machines',
+            'message': 'What docker machines will be used?',
+            'choices': generate_checkbox_choices(get_machine_list())
+        }
+        #  },
+        #  {
+        #  'type': 'input',
+        #  'name': 'username',
+        #  'message': 'Choose a username for the admin user'
+    ]
     answers = prompt(questions)
 
     # Ensure passwords match
     password_match = False
     while not password_match:
         password_questions = [{
-            'type': 'password',
-            'name': 'password',
-            'message': 'Choose a password for the admin user:',
+            'type':
+            'password',
+            'name':
+            'password',
+            'message':
+            'Choose a password for the ohadmin user:',
         },
             {
-            'type': 'password',
-            'name': 'confirm',
-            'message': 'Repeat password for the admin user',
+            'type':
+            'password',
+            'name':
+            'confirm',
+            'message':
+            'Repeat password for the ohadmin user',
         }]
         password_answers = prompt(password_questions)
         if password_answers['password'] == password_answers['confirm']:
@@ -765,7 +776,7 @@ def init_menu(args):
     generate_config_folders(base_dir)
     generate_initial_compose(base_dir)
     # Generate config files based on input
-    username = answers['username']
+    username = ADMIN_USER
     password = password_answers['password']
     hosts = answers['machines']
     generate_sftp_file(base_dir, username, password)
