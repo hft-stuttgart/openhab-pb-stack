@@ -65,9 +65,23 @@ docker-compose
 docker-machine
 python
 mosquitto (mosquitto_passwd utility)
+ssh-keygen
 ```
 
+On a Ubuntu System these can be installed following these commands:
+
+```bash
+sudo apt install mosquitto 			# Needed to use mosquitto_passwd
+sudo systemctl stop mosquitto 		# Stop Mosquitto service
+sudo systemctl disable mosquitto	# Disable Mosquitto service
+```
+
+The setup also expects a working docker-machine environment. To connect all instances (on at least one of the machines) follow [these instructions](https://docs.docker.com/machine/drivers/generic/).
+
+
+
 **Python:**
+
 ```sh
 docker
 PyInquirer
@@ -76,7 +90,7 @@ bcrypt
 pip-tools
 ```
 
-All python requirements managed using `pip-tool` in the `requirements.in` file. The command `pip-compile`  generates a `requirements.txt` file that  can be used with with `pip install -r requirements.txt`  to install all needed python dependencies, updating the `requirements.txt` file can be done using `pip-compile` again. In an virtual environment `pip-sync` can be used instead of pip install to install needed packages.
+All python requirements managed using `pip-tool` in the `requirements.in` file. The command `pip-compile`  generates a `requirements.txt` file that  can be used with with `pip install--user -r requirements.txt`  to install all needed python dependencies, updating the `requirements.txt` file can be done using `pip-compile` again. In an virtual environment `pip-sync` can be used instead of pip install to install needed packages.
 
 ### Config file generation
 
