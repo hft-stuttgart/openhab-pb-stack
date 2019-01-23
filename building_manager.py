@@ -554,10 +554,14 @@ def generate_swarm(machines):
             print(f'Create initial swarm with leader {leader}')
             if init_swarm_machine(leader):
                 print('Swarm init successful\n')
+                assign_label_to_node(leader, 'building',
+                                     leader, manager=leader)
         else:
             print(f'Machine {machine} joins swarm of leader {leader}')
             if (join_swarm_machine(machine, leader)):
                 print('Joining swarm successful\n')
+                assign_label_to_node(machine, 'building',
+                                     machine, manager=leader)
 
 
 # }}}
@@ -566,19 +570,25 @@ def generate_swarm(machines):
 # ******************************
 # Docker client commands {{{
 # ******************************
-def assign_label_to_node(nodeid, label, value):
+def assign_label_to_node(nodeid, label, value, manager=None):
     """Assigns a label to a node (e.g. building)
 
     :nodeid: Id or name of the node
     :label: Label you want to add
     :value: The value to assign to the label
+    :manager: Dpcker machine to use for command, otherwise local
     """
-    client = docker.from_env()
+    if manager:
+        building_env = get_machine_env(manager)
+        client = docker.from_env(environment=building_env)
+    else:
+        client = docker.from_env()
 
     node = client.nodes.get(nodeid)
     spec = node.attrs['Spec']
     spec['Labels'][label] = value
     node.update(spec)
+    logging.info(f'Assign label {label} with value {value} to {nodeid}')
 
     client.close()
 
