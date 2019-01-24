@@ -1,7 +1,8 @@
-version: "3.3"
+version: "3.5"
 
 networks:
     habnet:
+        name: habnet
         driver: overlay
         attachable: true
 
@@ -115,7 +116,7 @@ services:
             - habnet
         deploy:
             labels:
-                - "traefik.docker.network=ohpb_habnet"
+                - "traefik.docker.network=habnet"
                 - "traefik.port=8181"
             placement:
                 constraints:
@@ -134,7 +135,7 @@ services:
         deploy:
             labels:
                 - "traefik.port=1880"
-                - "traefik.docker.network=ohpb_habnet"
+                - "traefik.docker.network=habnet"
             placement:
                 constraints:
                     - node.labels.building == X
