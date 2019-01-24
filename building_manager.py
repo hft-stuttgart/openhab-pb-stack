@@ -126,11 +126,20 @@ def add_openhab_service(base_dir, hostname):
         # only label contraint is building
         template['deploy']['placement']['constraints'][0] = (
             f"{CONSTRAINTS['building']} == {hostname}")
-        template['deploy']['labels'].append(f'traefik.backend={service_name}')
+        # include in backups of this building
         template['deploy']['labels'].append(f'backup={hostname}')
+        # traefik backend
+        template['deploy']['labels'].append(f'traefik.backend={service_name}')
+        # traefik frontend domain->openhab
         template['deploy']['labels'].append(
-            f'traefik.frontend.rule=HostRegexp:'
-            f'{hostname}.{{domain:[a-zA-z0-9-]+}}')
+            f'traefik.main.frontend.rule=HostRegexp:{{domain:{hostname}}}')
+        template['deploy']['labels'].append('traefik.main.frontend.priority=1')
+        # traefik frontend subdomain openhab_hostname.* -> openhab
+        template['deploy']['labels'].append(
+            f'traefik.sub.frontend.rule=HostRegexp:'
+            f'{service_name}.{{domain:[a-zA-z0-9-]+}}')
+        template['deploy']['labels'].append('traefik.sub.frontend.priority=2')
+
         compose['services'][service_name] = template
         # write content starting from first line
         compose_f.seek(0)
@@ -165,6 +174,7 @@ def add_nodered_service(base_dir, hostname):
         template['deploy']['labels'].append(
             f'traefik.frontend.rule=HostRegexp:'
             f'{service_name}.{{domain:[a-zA-z0-9-]+}}')
+        template['deploy']['labels'].append('traefik.frontend.priority=2')
         compose['services'][service_name] = template
         # write content starting from first line
         compose_f.seek(0)
@@ -219,8 +229,6 @@ def get_service_template(base_dir, service_name):
         template_content = yaml.load(templates_file)
 
     return template_content['services'][service_name]
-
-
 # }}}
 
 
@@ -822,7 +830,7 @@ def init_machine_menu(base_dir, host, increment):
         {
             'type': 'checkbox',
             'name': 'services',
-            'message': 'What services shall {host} provide?',
+            'message': f'What services shall {host} provide?',
             'choices': generate_checkbox_choices(SERVICES.keys(), checked=True)
         }
     ]
