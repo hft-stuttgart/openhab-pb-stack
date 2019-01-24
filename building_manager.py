@@ -353,7 +353,7 @@ def generate_id_rsa_files(base_dir):
     # execute ssh-keygen
     id_result = run(
         ['ssh-keygen', '-t', 'rsa', '-b', '4096', '-f', id_path, '-N', ''],
-        universal_newlines=True)
+        universal_newlines=True, stdout=PIPE)
     return id_result.returncode == 0
 
 
@@ -370,7 +370,7 @@ def generate_host_key_files(base_dir, hosts):
 
     # execute ssh-keygen
     id_result = run(['ssh-keygen', '-t', 'ed25519', '-f', key_path, '-N', ''],
-                    universal_newlines=True)
+                    universal_newlines=True, stdout=PIPE)
 
     # read content of public key as known line
     known_line = ""
@@ -744,11 +744,6 @@ def init_menu(args):
             'message': 'What docker machines will be used?',
             'choices': generate_checkbox_choices(get_machine_list())
         }
-        #  },
-        #  {
-        #  'type': 'input',
-        #  'name': 'username',
-        #  'message': 'Choose a username for the admin user'
     ]
     answers = prompt(questions)
 
@@ -792,10 +787,7 @@ def init_menu(args):
     generate_host_key_files(base_dir, hosts)
 
     for i, host in enumerate(hosts):
-        add_sftp_service(base_dir, host, i)
-        add_openhab_service(base_dir, host)
-        add_nodered_service(base_dir, host)
-        add_mqtt_service(base_dir, host, i)
+        init_machine_menu(base_dir, host, i)
 
     # print(answers)
     print(f"Configuration files generated in {base_dir}")
@@ -811,6 +803,40 @@ def init_menu(args):
 
     if generate_answers['generate']:
         generate_swarm(answers['machines'])
+
+
+def init_machine_menu(base_dir, host, increment):
+    """Prompts to select server services
+
+    :base_dir: Directory of config files
+    :host: docker-machine host
+    :increment: incrementing number to ensure ports are unique
+    """
+    # Prompt for services
+    questions = [
+        {
+            'type': 'input',
+            'name': 'buildingid',
+            'message': f'Choose a name for building on server {host}'
+        },
+        {
+            'type': 'checkbox',
+            'name': 'services',
+            'message': 'What services shall {host} provide?',
+            'choices': generate_checkbox_choices(SERVICES.keys(), checked=True)
+        }
+    ]
+    answers = prompt(questions)
+    services = answers['services']
+    if 'sftp' in services:
+        add_sftp_service(base_dir, host, increment)
+    if 'openhab' in services:
+        add_openhab_service(base_dir, host)
+    if 'nodered' in services:
+        add_nodered_service(base_dir, host)
+    if 'mqtt' in services:
+        add_mqtt_service(base_dir, host, increment)
+    print(answers)
 
 
 def load_main_entires(base_dir):
@@ -832,15 +858,16 @@ def load_main_entires(base_dir):
     return entries
 
 
-def generate_checkbox_choices(list):
+def generate_checkbox_choices(list, checked=False):
     """Generates checkbox entries for lists of strings
 
+    :list: pyhton list that shall be converted
+    :checked: if true, selections will be checked by default
     :returns: A list of dicts with name keys
     """
-    return [{'name': m} for m in list]
-
-
+    return [{'name': m, 'checked': checked} for m in list]
 # }}}
+
 
 # ******************************
 # Script main ( entry) {{{
