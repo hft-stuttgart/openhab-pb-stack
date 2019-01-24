@@ -59,21 +59,22 @@ To ease initial setup and management the `building_manager.py` is provided. This
 The script has a few requirements for the system and the python environment.
 
 **System:**
-```sh
+```
 docker
 docker-compose
 docker-machine
-python
-mosquitto (mosquitto_passwd utility)
+python3 (at least 3.6)
+python3-pip
+mosquitto (needed to for mosquitto_passwd utility)
 ssh-keygen
 ```
 
 On a Ubuntu System these can be installed following these commands:
 
 ```bash
-sudo apt install mosquitto 			# Needed to use mosquitto_passwd
-sudo systemctl stop mosquitto 		# Stop Mosquitto service
-sudo systemctl disable mosquitto	# Disable Mosquitto service
+sudo apt install mosquitto, python3-pip		# Needed to use mosquitto_passwd
+sudo systemctl stop mosquitto				# Stop Mosquitto service
+sudo systemctl disable mosquitto			# Disable Mosquitto service
 ```
 
 The setup also expects a working docker-machine environment. To connect all instances (on at least one of the machines) follow [these instructions](https://docs.docker.com/machine/drivers/generic/).

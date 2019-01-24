@@ -848,7 +848,7 @@ def generate_checkbox_choices(list):
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser(
-        prog='building_manger',
+        prog='building_manager',
         description='Generate and manage multi'
         'building configurations of openHAB with docker swarm')
     parser.add_argument(
