@@ -91,7 +91,15 @@ bcrypt
 pip-tools
 ```
 
-All python requirements managed using `pip-tool` in the `requirements.in` file. The command `pip-compile`  generates a `requirements.txt` file that  can be used with with `pip install--user -r requirements.txt`  to install all needed python dependencies, updating the `requirements.txt` file can be done using `pip-compile` again. In an virtual environment `pip-sync` can be used instead of pip install to install needed packages.
+All python requirements managed using `pip-tool` in the `requirements.in` file. The command `pip-compile`  generates a `requirements.txt` file that  can be used with with `pip install--user -r requirements.txt`  to install all needed python dependencies. E.g. on Ubuntu you can execute the following:
+
+
+
+```
+pip3 install --user -r requirements.txt
+```
+
+Updating the `requirements.txt` file can be done using `pip-compile` again. In an virtual environment `pip-sync` can be used instead of pip install to install needed packages.
 
 ### Config file generation
 
