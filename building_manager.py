@@ -149,6 +149,8 @@ def add_nodered_service(base_dir, hostname):
     template['deploy']['labels'].append(f'backup={hostname}')
     template['deploy']['labels'].extend(
         generate_traefik_path_labels(service_name, segment='main'))
+    template['deploy']['labels'].extend(
+        generate_traefik_subdomain_labels(service_name, segment='sub'))
 
     add_or_update_compose_service(compose_path, service_name, template)
 
@@ -205,6 +207,25 @@ def generate_traefik_host_labels(hostname, segment=None, priority=1):
     # fill list
     label_list.append(
         f'traefik{segment}.frontend.rule=HostRegexp:{{domain:{hostname}}}')
+    label_list.append(f'traefik{segment}.frontend.priority={priority}')
+    return label_list
+
+
+def generate_traefik_subdomain_labels(subdomain, segment=None, priority=2):
+    """Generates a traefik subdomain with necessary redirects
+
+    :subdomain: subdomain that will be assigned to a service
+    :segment: Optional traefik segment when using multiple rules
+    :priority: Priority of frontend rule
+    :returns: list of labels for traefik
+    """
+    label_list = []
+    # check segment
+    segment = f'.{segment}' if segment is not None else ''
+    # fill list
+    label_list.append(
+        f'traefik{segment}.frontend.rule='
+        f'HostRegexp:{subdomain}.{{domain:[a-zA-z0-9-]+}}')
     label_list.append(f'traefik{segment}.frontend.priority={priority}')
     return label_list
 
