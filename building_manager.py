@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-import bcrypt
+""" Python module to assist creating and maintaining docker openHab stacks."""
 import crypt
-import docker
 import logging
 import os
-# import yaml
-
 from shutil import copy2
-from subprocess import run, PIPE
+from subprocess import PIPE, run
+
+import bcrypt
+import docker
 from PyInquirer import prompt
 from ruamel.yaml import YAML
 
@@ -85,25 +85,16 @@ def add_sftp_service(base_dir, hostname, number=0):
     base_path = base_dir + '/' + CUSTOM_DIR
     # compose file
     compose_path = base_path + '/' + COMPOSE_NAME
-    # template
-    template = get_service_template(base_dir, SERVICES['sftp'])
     # service name
     service_name = f'sftp_{hostname}'
+    # template
+    template = get_service_template(base_dir, SERVICES['sftp'])
+    # only label contraint is building
+    template['deploy']['placement']['constraints'][0] = (
+        f"{CONSTRAINTS['building']} == {hostname}")
+    template['ports'] = [f'{2222 + number}:22']
 
-    with open(compose_path, 'r+') as compose_f:
-        # load compose file
-        compose = yaml.load(compose_f)
-        # only label contraint is building
-        template['deploy']['placement']['constraints'][0] = (
-            f"{CONSTRAINTS['building']} == {hostname}")
-        template['ports'] = [f'{2222 + number}:22']
-        compose['services'][service_name] = template
-        # write content starting from first line
-        compose_f.seek(0)
-        # write new compose content
-        yaml.dump(compose, compose_f)
-        # reduce file to new size
-        compose_f.truncate()
+    add_or_update_compose_service(compose_path, service_name, template)
 
 
 def add_openhab_service(base_dir, hostname):
@@ -115,38 +106,27 @@ def add_openhab_service(base_dir, hostname):
     base_path = base_dir + '/' + CUSTOM_DIR
     # compose file
     compose_path = base_path + '/' + COMPOSE_NAME
-    # template
-    template = get_service_template(base_dir, SERVICES['openhab'])
     # service name
     service_name = f'openhab_{hostname}'
+    # template
+    template = get_service_template(base_dir, SERVICES['openhab'])
+    # only label contraint is building
+    template['deploy']['placement']['constraints'][0] = (
+        f"{CONSTRAINTS['building']} == {hostname}")
+    # include in backups of this building
+    template['deploy']['labels'].append(f'backup={hostname}')
+    # traefik backend
+    template['deploy']['labels'].append(f'traefik.backend={service_name}')
+    # traefik frontend domain->openhab
+    template['deploy']['labels'].extend(
+        generate_traefik_host_labels(hostname, segment='main'))
+    # traefik frontend subdomain openhab_hostname.* -> openhab
+    template['deploy']['labels'].append(
+        f'traefik.sub.frontend.rule=HostRegexp:'
+        f'{service_name}.{{domain:[a-zA-z0-9-]+}}')
+    template['deploy']['labels'].append('traefik.sub.frontend.priority=2')
 
-    with open(compose_path, 'r+') as compose_f:
-        # load compose file
-        compose = yaml.load(compose_f)
-        # only label contraint is building
-        template['deploy']['placement']['constraints'][0] = (
-            f"{CONSTRAINTS['building']} == {hostname}")
-        # include in backups of this building
-        template['deploy']['labels'].append(f'backup={hostname}')
-        # traefik backend
-        template['deploy']['labels'].append(f'traefik.backend={service_name}')
-        # traefik frontend domain->openhab
-        template['deploy']['labels'].append(
-            f'traefik.main.frontend.rule=HostRegexp:{{domain:{hostname}}}')
-        template['deploy']['labels'].append('traefik.main.frontend.priority=1')
-        # traefik frontend subdomain openhab_hostname.* -> openhab
-        template['deploy']['labels'].append(
-            f'traefik.sub.frontend.rule=HostRegexp:'
-            f'{service_name}.{{domain:[a-zA-z0-9-]+}}')
-        template['deploy']['labels'].append('traefik.sub.frontend.priority=2')
-
-        compose['services'][service_name] = template
-        # write content starting from first line
-        compose_f.seek(0)
-        # write new compose content
-        yaml.dump(compose, compose_f)
-        # reduce file to new size
-        compose_f.truncate()
+    add_or_update_compose_service(compose_path, service_name, template)
 
 
 def add_nodered_service(base_dir, hostname):
@@ -158,30 +138,19 @@ def add_nodered_service(base_dir, hostname):
     base_path = base_dir + '/' + CUSTOM_DIR
     # compose file
     compose_path = base_path + '/' + COMPOSE_NAME
-    # template
-    template = get_service_template(base_dir, SERVICES['nodered'])
     # service name
     service_name = f'nodered_{hostname}'
+    # template
+    template = get_service_template(base_dir, SERVICES['nodered'])
+    # only label contraint is building
+    template['deploy']['placement']['constraints'][0] = (
+        f"{CONSTRAINTS['building']} == {hostname}")
+    template['deploy']['labels'].append(f'traefik.backend={service_name}')
+    template['deploy']['labels'].append(f'backup={hostname}')
+    template['deploy']['labels'].extend(
+        generate_traefik_path_labels(service_name, segment='main'))
 
-    with open(compose_path, 'r+') as compose_f:
-        # load compose file
-        compose = yaml.load(compose_f)
-        # only label contraint is building
-        template['deploy']['placement']['constraints'][0] = (
-            f"{CONSTRAINTS['building']} == {hostname}")
-        template['deploy']['labels'].append(f'traefik.backend={service_name}')
-        template['deploy']['labels'].append(f'backup={hostname}')
-        template['deploy']['labels'].append(
-            f'traefik.frontend.rule=HostRegexp:'
-            f'{service_name}.{{domain:[a-zA-z0-9-]+}}')
-        template['deploy']['labels'].append('traefik.frontend.priority=2')
-        compose['services'][service_name] = template
-        # write content starting from first line
-        compose_f.seek(0)
-        # write new compose content
-        yaml.dump(compose, compose_f)
-        # reduce file to new size
-        compose_f.truncate()
+    add_or_update_compose_service(compose_path, service_name, template)
 
 
 def add_mqtt_service(base_dir, hostname, number=0):
@@ -194,29 +163,20 @@ def add_mqtt_service(base_dir, hostname, number=0):
     base_path = base_dir + '/' + CUSTOM_DIR
     # compose file
     compose_path = base_path + '/' + COMPOSE_NAME
-    # template
-    template = get_service_template(base_dir, SERVICES['mqtt'])
     # service name
     service_name = f'mqtt_{hostname}'
+    # template
+    template = get_service_template(base_dir, SERVICES['mqtt'])
+    # only label contraint is building
+    template['deploy']['placement']['constraints'][0] = (
+        f"{CONSTRAINTS['building']} == {hostname}")
+    # ports incremented by number of services
+    template['ports'] = [f'{1883 + number}:1883', f'{9001 + number}:9001']
 
-    with open(compose_path, 'r+') as compose_f:
-        # load compose file
-        compose = yaml.load(compose_f)
-        # only label contraint is building
-        template['deploy']['placement']['constraints'][0] = (
-            f"{CONSTRAINTS['building']} == {hostname}")
-        # ports incremented by number of services
-        template['ports'] = [f'{1883 + number}:1883', f'{9001 + number}:9001']
-        # write template as service
-        compose['services'][service_name] = template
-        # write content starting from first line
-        compose_f.seek(0)
-        # write new compose content
-        yaml.dump(compose, compose_f)
-        # reduce file to new size
-        compose_f.truncate()
+    add_or_update_compose_service(compose_path, service_name, template)
 
 
+# Helper functions
 def get_service_template(base_dir, service_name):
     """Gets a service template entry from the template yaml
 
@@ -229,6 +189,67 @@ def get_service_template(base_dir, service_name):
         template_content = yaml.load(templates_file)
 
     return template_content['services'][service_name]
+
+
+def generate_traefik_host_labels(hostname, segment=None, priority=1):
+    """Generates a traefik path url with necessary redirects
+
+    :hostname: Hostname that gets assigned by the label
+    :segment: Optional traefik segment when using multiple rules
+    :priority: Priority of frontend rule
+    :returns: list of labels for traefik
+    """
+    label_list = []
+    # check segment
+    segment = f'.{segment}' if segment is not None else ''
+    # fill list
+    label_list.append(
+        f'traefik{segment}.frontend.rule=HostRegexp:{{domain:{hostname}}}')
+    label_list.append(f'traefik{segment}.frontend.priority={priority}')
+    return label_list
+
+
+def generate_traefik_path_labels(url_path, segment=None, priority=2):
+    """Generates a traefik path url with necessary redirects
+
+    :url_path: path that should be used for the site
+    :segment: Optional traefik segment when using multiple rules
+    :priority: Priority of frontend rule
+    :returns: list of labels for traefik
+    """
+    label_list = []
+    # check segment
+    segment = f'.{segment}' if segment is not None else ''
+    # fill list
+    label_list.append(f'traefik{segment}.frontend.priority={priority}')
+    label_list.append(
+        f'traefik{segment}.frontend.redirect.regex=^(.*)/{url_path}$$')
+    label_list.append(
+        f'traefik{segment}.frontend.redirect.replacement=$$1/{url_path}/')
+    label_list.append(
+        f'traefik{segment}.frontend.rule=PathPrefix:/{url_path};'
+        f'ReplacePathRegex:^/{url_path}/(.*) /$$1')
+    return label_list
+
+
+def add_or_update_compose_service(compose_path, service_name, service_content):
+    """Adds or replaces a service in a compose file
+
+    :compose_path: path of the compose file to change
+    :service_name: name of the service to add/replace
+    :service_content: service definition to add
+    """
+    with open(compose_path, 'r+') as compose_f:
+        # load compose file
+        compose = yaml.load(compose_f)
+        # add / update service with template
+        compose['services'][service_name] = service_content
+        # write content starting from first line
+        compose_f.seek(0)
+        # write new compose content
+        yaml.dump(compose, compose_f)
+        # reduce file to new size
+        compose_f.truncate()
 # }}}
 
 
