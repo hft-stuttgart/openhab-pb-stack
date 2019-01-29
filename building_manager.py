@@ -3,6 +3,7 @@
 import crypt
 import logging
 import os
+from hashlib import md5
 from shutil import copy2
 from subprocess import PIPE, run
 
@@ -24,7 +25,8 @@ TEMPLATE_DIR = 'template_configs'
 COMPOSE_NAME = 'docker-stack.yml'
 SKELETON_NAME = 'docker-skeleton.yml'
 TEMPLATES_NAME = 'docker-templates.yml'
-CONFIG_DIRS = ['mosquitto', 'nodered', 'ssh', 'traefik', 'volumerize']
+CONFIG_DIRS = ['mosquitto', 'nodered', 'ssh',
+               'traefik', 'volumerize', 'postgres']
 TEMPLATE_FILES = [
     'mosquitto/mosquitto.conf', 'nodered/nodered_package.json',
     'nodered/nodered_settings.js', 'ssh/sshd_config', 'traefik/traefik.toml'
@@ -36,13 +38,16 @@ EDIT_FILES = {
     "id_rsa": "ssh/id_rsa",
     "host_key": "ssh/ssh_host_ed25519_key",
     "known_hosts": "ssh/known_hosts",
-    "backup_config": "volumerize/backup_config.json"
+    "backup_config": "volumerize/backup_config.json",
+    "postgres_user": "postgres/user",
+    "postgres_passwd": "postgres/passwd"
 }
 CONSTRAINTS = {"building": "node.labels.building"}
 SERVICES = {
     "sftp": "sftp_X",
     "openhab": "openhab_X",
     "nodered": "nodered_X",
+    "postgres": "postgres_X",
     "mqtt": "mqtt_X"
 }
 
@@ -174,6 +179,26 @@ def add_mqtt_service(base_dir, hostname, number=0):
         f"{CONSTRAINTS['building']} == {hostname}")
     # ports incremented by number of services
     template['ports'] = [f'{1883 + number}:1883', f'{9001 + number}:9001']
+
+    add_or_update_compose_service(compose_path, service_name, template)
+
+
+def add_postgres_service(base_dir, hostname):
+    """Generates an postgres entry and adds it to the compose file
+
+    :base_dir: base directory for configuration files
+    :hostname: names of host that the services is added to
+    """
+    base_path = base_dir + '/' + CUSTOM_DIR
+    # compose file
+    compose_path = base_path + '/' + COMPOSE_NAME
+    # service name
+    service_name = f'postgres_{hostname}'
+    # template
+    template = get_service_template(base_dir, SERVICES['postgres'])
+    # only label contraint is building
+    template['deploy']['placement']['constraints'][0] = (
+        f"{CONSTRAINTS['building']} == {hostname}")
 
     add_or_update_compose_service(compose_path, service_name, template)
 
@@ -391,6 +416,22 @@ def generate_sftp_file(base_dir, username, password, direcories=None):
     file_content = generate_sftp_user_line(username, password, direcories)
     create_or_replace_config_file(base_dir, EDIT_FILES['sftp_users'],
                                   file_content)
+
+
+def generate_postgres_files(base_dir, username, password):
+    """Generates postgres user and password files
+
+    :base_dir: path that contains custom config folder
+    :username: username to use
+    :password: password that will be used
+    """
+    # content is purely username and (hashed) password
+    hashed_password = 'md5' + \
+        md5(username.encode() + password.encode()).hexdigest()
+    create_or_replace_config_file(
+        base_dir, EDIT_FILES['postgres_user'], username)
+    create_or_replace_config_file(
+        base_dir, EDIT_FILES['postgres_passwd'], hashed_password)
 
 
 def generate_id_rsa_files(base_dir):
@@ -668,7 +709,8 @@ def run_command_in_service(service, command, building=None):
         service_container = containers[0]
         print(f'Executing {command} in container {service_container.name}'
               f'({service_container.id}) on building {building}')
-        print(service_container.exec_run(command))
+        command_exec = service_container.exec_run(command)
+        print(command_exec.output.decode())
     client.close()
 
 
@@ -830,6 +872,7 @@ def init_menu(args):
     password = password_answers['password']
     hosts = answers['machines']
     generate_sftp_file(base_dir, username, password)
+    generate_postgres_files(base_dir, username, password)
     generate_mosquitto_file(base_dir, username, password)
     generate_traefik_file(base_dir, username, password)
     generate_volumerize_file(base_dir, hosts)
@@ -867,7 +910,8 @@ def init_machine_menu(base_dir, host, increment):
         {
             'type': 'input',
             'name': 'buildingid',
-            'message': f'Choose a name for building on server {host}'
+            'message': f'Choose a name for building on server {host}',
+            'default': f'{host}'
         },
         {
             'type': 'checkbox',
@@ -886,6 +930,8 @@ def init_machine_menu(base_dir, host, increment):
         add_nodered_service(base_dir, host)
     if 'mqtt' in services:
         add_mqtt_service(base_dir, host, increment)
+    if 'postgres' in services:
+        add_postgres_service(base_dir, host)
     print(answers)
 
 

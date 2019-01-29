@@ -33,6 +33,10 @@ configs:
         file: ./mosquitto/mosquitto_passwords
     mosquitto_settings:
         file: ./mosquitto/mosquitto.conf
+    postgres_user:
+        file: ./postgres/user
+    postgres_passwd:
+        file: ./postgres/passwd
 
 volumes:
     openhab_addons:
@@ -41,6 +45,7 @@ volumes:
     nodered_data:
     mosquitto_data:
     influxdb_data:
+    postgres_data:
     backup_data:
     backup_cache:
 
@@ -172,6 +177,26 @@ services:
             INFLUXDB_ADMIN_PASSWORD: "ohadmin"
             INFLUXDB_USER: "ohadmin"
             INFLUXDB_USER_PASSWORD: "ohtest"
+        networks:
+            - habnet
+        deploy:
+            placement:
+                constraints:
+                    - node.labels.building == X
+    postgres_X:
+        image: "postgres"
+        volumes:
+            - "postgres_data:/var/lib/postgresql/data/pgdata"
+        configs:
+            - source: postgres_user
+              target: /run/secrets/postgres_user
+            - source: postgres_passwd
+              target: /run/secrets/postgres_passwd
+        environment:
+            PGDATA: "/var/lib/postgresql/data/pgdata"
+            POSTGRES_USER_FILE: "/run/secrets/postgres_user"
+            POSTGRES_PASSWORD_FILE: "/run/secrets/postgres_passwd"
+            POSTGRES_DB: "openhab"
         networks:
             - habnet
         deploy:

@@ -33,6 +33,10 @@ configs:
         file: ./mosquitto/mosquitto_passwords
     mosquitto_settings:
         file: ./mosquitto/mosquitto.conf
+    postgres_user:
+        file: ./postgres/user
+    postgres_passwd:
+        file: ./postgres/passwd
 
 volumes:
     openhab_addons:
@@ -41,9 +45,10 @@ volumes:
     nodered_data:
     mosquitto_data:
     influxdb_data:
-    unison_data:
+    postgres_data:
     backup_data:
     backup_cache:
+
     
 services:
     proxy:
