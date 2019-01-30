@@ -656,19 +656,49 @@ def generate_swarm(machines):
 # ******************************
 # Docker client commands {{{
 # ******************************
+def resolve_service_nodes(service):
+    """Returnes nodes running on a specified service
+
+    :service: name or id of a service
+    :returns: list of nodes running the service
+    """
+    node_result = run(['docker', 'service', 'ps', service,
+                       '--format', '{{.Node}}',
+                       '-f', 'desired-state=running'],
+                      universal_newlines=True,
+                      stdout=PIPE)
+    return node_result.stdout.splitlines()
+
+
+def get_container_list(manager=None):
+    """Return a list of containers running on a machine
+
+    :manager: Docker machine to use for command, otherwise local
+    :returns: list of containers
+    """
+    client = get_docker_client(manager)
+    return [c.name for c in client.containers.list()]
+
+
+def get_service_list(manager=None):
+    """Return a list of services managed by a machine
+
+    :manager: Docker machine to use for command, otherwise local
+    :returns: list of services
+    """
+    client = get_docker_client(manager)
+    return [s.name for s in client.services.list()]
+
+
 def assign_label_to_node(nodeid, label, value, manager=None):
     """Assigns a label to a node (e.g. building)
 
     :nodeid: Id or name of the node
     :label: Label you want to add
     :value: The value to assign to the label
-    :manager: Dpcker machine to use for command, otherwise local
+    :manager: Docker machine to use for command, otherwise local
     """
-    if manager:
-        building_env = get_machine_env(manager)
-        client = docker.from_env(environment=building_env)
-    else:
-        client = docker.from_env()
+    client = get_docker_client(manager)
 
     node = client.nodes.get(nodeid)
     spec = node.attrs['Spec']
@@ -689,11 +719,7 @@ def run_command_in_service(service, command, building=None):
     :param building: Optional building, make service unambigous (Default: None)
     """
 
-    if building:
-        building_env = get_machine_env(building)
-        client = docker.from_env(environment=building_env)
-    else:
-        client = docker.from_env()
+    client = get_docker_client(building)
 
     # Find containers matching name
     service_name_filter = {"name": service}
@@ -708,12 +734,24 @@ def run_command_in_service(service, command, building=None):
     else:
         service_container = containers[0]
         print(f'Executing {command} in container {service_container.name}'
-              f'({service_container.id}) on building {building}')
+              f'({service_container.id}) on building {building}\n')
         command_exec = service_container.exec_run(command)
         print(command_exec.output.decode())
     client.close()
 
 
+def get_docker_client(manager=None):
+    """Returns docker client instance
+
+    :manager: Optional machine to use, local otherwise
+    :returns: Docker client instance
+    """
+    if manager:
+        machine_env = get_machine_env(manager)
+        client = docker.from_env(environment=machine_env)
+    else:
+        client = docker.from_env()
+    return client
 # }}}
 
 
@@ -807,15 +845,40 @@ def main_menu(args):
         'choices': load_main_entires(base_dir)
     }]
     answers = prompt(questions)
+    choice = answers['main']
 
-    if 'Create' in answers['main']:
+    if 'Create' in choice:
         init_menu(args)
+    elif 'Execute' in choice:
+        exec_menu(args)
 
     return answers
 
 
+def load_main_entires(base_dir):
+    """Loads entries for main menu depending on available files
+
+    :base_dir: directory of configuration files
+    :returns: entries of main menu
+    """
+    custom_path = base_dir + '/' + CUSTOM_DIR
+
+    entries = []
+    if not os.path.exists(custom_path):
+        entries.append('Create initial structure')
+    else:
+        entries.append('Execute a command in a service container')
+
+    entries.append('Exit')
+
+    return entries
+
+
+# *** Main Menu Entries ***
 def init_menu(args):
     """Menu entry for initial setup and file generation
+
+    :args: Passed commandline arguments
     """
     # Base directory for configs
     base_dir = args.base_dir
@@ -898,6 +961,32 @@ def init_menu(args):
         generate_swarm(answers['machines'])
 
 
+def exec_menu(args):
+    """Menu entry for executing commands in services
+
+    :args: Passed commandline arguments
+    """
+    machine = docker_client_prompt(" to execute command at")
+    questions = [
+        {
+            'type': 'list',
+            'name': 'service_name',
+            'message': 'Which service container shall execute the command?',
+            'choices': get_container_list(machine)
+        },
+        {
+            'type': 'input',
+            'name': 'command',
+            'message': 'What command should be executed?'
+        }
+    ]
+    answers = prompt(questions)
+    run_command_in_service(
+        answers['service_name'], answers['command'], machine)
+    print(answers)
+
+
+# *** Sub Menu Entries ***
 def init_machine_menu(base_dir, host, increment):
     """Prompts to select server services
 
@@ -935,25 +1024,7 @@ def init_machine_menu(base_dir, host, increment):
     print(answers)
 
 
-def load_main_entires(base_dir):
-    """Loads entries for main menu depending on available files
-
-    :base_dir: directory of configuration files
-    :returns: entries of main menu
-    """
-    custom_path = base_dir + '/' + CUSTOM_DIR
-
-    entries = []
-    if not os.path.exists(custom_path):
-        entries.append('Create initial structure')
-    else:
-        entries.append('Execute command')
-
-    entries.append('Exit')
-
-    return entries
-
-
+# *** Menu Helper Functions ***
 def generate_checkbox_choices(list, checked=False):
     """Generates checkbox entries for lists of strings
 
@@ -962,6 +1033,24 @@ def generate_checkbox_choices(list, checked=False):
     :returns: A list of dicts with name keys
     """
     return [{'name': m, 'checked': checked} for m in list]
+
+
+def docker_client_prompt(message_details=''):
+    """Show list of docker machines and return selection
+
+    :manager: Optional machine to use, prompt otherwise
+    :returns: Docker client instance
+    """
+    questions = [
+        {
+            'type': 'list',
+            'name': 'machine',
+            'message': f'Choose manager machine{message_details}',
+            'choices': get_machine_list()
+        }
+    ]
+    answers = prompt(questions)
+    return answers['machine']
 # }}}
 
 
