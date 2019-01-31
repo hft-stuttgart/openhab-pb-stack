@@ -1,5 +1,4 @@
 bcrypt
 docker
-PyInquirer
-pyyaml
+questionary
 ruamel.yaml

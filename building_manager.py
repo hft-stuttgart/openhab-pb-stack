@@ -9,8 +9,9 @@ from subprocess import PIPE, run
 
 import bcrypt
 import docker
-from PyInquirer import prompt
+import questionary as qust
 from ruamel.yaml import YAML
+from prompt_toolkit.styles import Style
 
 # Configure YAML
 yaml = YAML()
@@ -18,6 +19,21 @@ yaml.indent(mapping=4, sequence=4, offset=2)
 
 # Log level during development is info
 logging.basicConfig(level=logging.WARNING)
+
+# Prompt style
+st = Style([
+    ('qmark', 'fg:#00c4b4 bold'),     # token in front of question
+    ('question', 'bold'),             # question text
+    ('answer', 'fg:#00c4b4 bold'),    # submitted answer question
+    ('pointer', 'fg:#00c4b4 bold'),   # pointer for select and checkbox
+    ('selected', 'fg:#00c4b4'),       # selected item checkbox
+    ('separator', 'fg:#00c4b4'),      # separator in lists
+    ('instruction', '')               # user instructions for selections
+])
+
+# ******************************
+# Constants <<<
+# ******************************
 
 # Directories for config generation
 CUSTOM_DIR = 'custom_configs'
@@ -57,12 +73,12 @@ SWARM_PORT = 2377
 UID = 9001
 # Username for admin
 ADMIN_USER = 'ohadmin'
+# >>>
+
 
 # ******************************
-# Compose file functions {{{
+# Compose file functions <<<
 # ******************************
-
-
 def generate_initial_compose(base_dir):
     """Creates the initial compose using the skeleton
 
@@ -296,11 +312,11 @@ def add_or_update_compose_service(compose_path, service_name, service_content):
         yaml.dump(compose, compose_f)
         # reduce file to new size
         compose_f.truncate()
-# }}}
+# >>>
 
 
 # ******************************
-# Config file functions {{{
+# Config file functions <<<
 # ******************************
 def generate_config_folders(base_dir):
     """Generate folders for configuration files
@@ -531,11 +547,11 @@ def create_or_replace_config_file(base_dir, config_path, content, json=False):
             file.write(content)
 
 
-# }}}
+# >>>
 
 
 # ******************************
-# Docker machine functions {{{
+# Docker machine functions <<<
 # ******************************
 def get_machine_list():
     """Get a list of docker machine names using the docker-machine system command
@@ -650,11 +666,11 @@ def generate_swarm(machines):
                                      machine, manager=leader)
 
 
-# }}}
+# >>>
 
 
 # ******************************
-# Docker client commands {{{
+# Docker client commands <<<
 # ******************************
 def resolve_service_nodes(service):
     """Returnes nodes running on a specified service
@@ -752,11 +768,11 @@ def get_docker_client(manager=None):
     else:
         client = docker.from_env()
     return client
-# }}}
+# >>>
 
 
 # ******************************
-# CLI base commands {{{
+# CLI base commands <<<
 # ******************************
 def init_config_dirs_command(args):
     """Initialize config directories
@@ -822,11 +838,11 @@ def interactive_command(args):
     main_menu(args)
 
 
-# }}}
+# >>>
 
 
 # ******************************
-# Interactive menu entries {{{
+# Interactive menu entries <<<
 # ******************************
 def main_menu(args):
     """ Display main menu
@@ -838,21 +854,15 @@ def main_menu(args):
         base_dir = os.getcwd()
 
     # Main menu prompts
-    questions = [{
-        'type': 'list',
-        'name': 'main',
-        'message': 'Public Building Manager - Main Menu',
-        'choices': load_main_entires(base_dir)
-    }]
-    answers = prompt(questions)
-    choice = answers['main']
+    choice = qust.select('Public Building Manager - Main Menu',
+                         choices=load_main_entires(base_dir), style=st).ask()
 
     if 'Create' in choice:
         init_menu(args)
     elif 'Execute' in choice:
         exec_menu(args)
 
-    return answers
+    return choice
 
 
 def load_main_entires(base_dir):
@@ -887,42 +897,18 @@ def init_menu(args):
         base_dir = os.getcwd()
 
     # Prompts
-    questions = [
-        {
-            'type': 'input',
-            'name': 'stack_name',
-            'message': 'Choose a name for your setup'
-        },
-        {
-            'type': 'checkbox',
-            'name': 'machines',
-            'message': 'What docker machines will be used?',
-            'choices': generate_checkbox_choices(get_machine_list())
-        }
-    ]
-    answers = prompt(questions)
-
+    stack_name = qust.text('Choose a name for your setup', style=st).ask()
+    hosts = qust.checkbox('What docker machines will be used?',
+                          choices=generate_cb_choices(
+                              get_machine_list()), style=st).ask()
     # Ensure passwords match
     password_match = False
     while not password_match:
-        password_questions = [{
-            'type':
-            'password',
-            'name':
-            'password',
-            'message':
-            'Choose a password for the ohadmin user:',
-        },
-            {
-            'type':
-            'password',
-            'name':
-            'confirm',
-            'message':
-            'Repeat password for the ohadmin user',
-        }]
-        password_answers = prompt(password_questions)
-        if password_answers['password'] == password_answers['confirm']:
+        password = qust.password(
+            'Choose a password for the ohadmin user:', style=st).ask()
+        confirm = qust.password(
+            'Repeat password for the ohadmin user:', style=st).ask()
+        if password == confirm:
             password_match = True
         else:
             print("Passwords did not match, try again")
@@ -932,8 +918,6 @@ def init_menu(args):
     generate_initial_compose(base_dir)
     # Generate config files based on input
     username = ADMIN_USER
-    password = password_answers['password']
-    hosts = answers['machines']
     generate_sftp_file(base_dir, username, password)
     generate_postgres_files(base_dir, username, password)
     generate_mosquitto_file(base_dir, username, password)
@@ -946,19 +930,14 @@ def init_menu(args):
         init_machine_menu(base_dir, host, i)
 
     # print(answers)
-    print(f"Configuration files generated in {base_dir}")
+    print(f"Configuration files for {stack_name} generated in {base_dir}")
 
     # Check if changes shall be applied to docker environment
-    generate_questions = [{
-        'type': 'confirm',
-        'name': 'generate',
-        'message': 'Apply changes to docker environment?',
-        'default': True
-    }]
-    generate_answers = prompt(generate_questions)
+    generate = qust.confirm(
+        'Apply changes to docker environment?', default=True, style=st).ask()
 
-    if generate_answers['generate']:
-        generate_swarm(answers['machines'])
+    if generate:
+        generate_swarm(hosts)
 
 
 def exec_menu(args):
@@ -967,23 +946,12 @@ def exec_menu(args):
     :args: Passed commandline arguments
     """
     machine = docker_client_prompt(" to execute command at")
-    questions = [
-        {
-            'type': 'list',
-            'name': 'service_name',
-            'message': 'Which service container shall execute the command?',
-            'choices': get_container_list(machine)
-        },
-        {
-            'type': 'input',
-            'name': 'command',
-            'message': 'What command should be executed?'
-        }
-    ]
-    answers = prompt(questions)
-    run_command_in_service(
-        answers['service_name'], answers['command'], machine)
-    print(answers)
+    service_name = qust.select(
+        'Which service container shall execute the command?',
+        choices=get_container_list(machine), style=st).ask()
+    command = qust.text('What command should be executed?', style=st).ask()
+
+    run_command_in_service(service_name, command, machine)
 
 
 # *** Sub Menu Entries ***
@@ -995,22 +963,12 @@ def init_machine_menu(base_dir, host, increment):
     :increment: incrementing number to ensure ports are unique
     """
     # Prompt for services
-    questions = [
-        {
-            'type': 'input',
-            'name': 'buildingid',
-            'message': f'Choose a name for building on server {host}',
-            'default': f'{host}'
-        },
-        {
-            'type': 'checkbox',
-            'name': 'services',
-            'message': f'What services shall {host} provide?',
-            'choices': generate_checkbox_choices(SERVICES.keys(), checked=True)
-        }
-    ]
-    answers = prompt(questions)
-    services = answers['services']
+    building = qust.text(f'Choose a name for building on server {host}',
+                         default=f'{host}', style=st).ask()
+    services = qust.checkbox(f'What services shall {host} provide?',
+                             choices=generate_cb_choices(SERVICES.keys(),
+                                                         checked=True),
+                             style=st).ask()
     if 'sftp' in services:
         add_sftp_service(base_dir, host, increment)
     if 'openhab' in services:
@@ -1021,11 +979,11 @@ def init_machine_menu(base_dir, host, increment):
         add_mqtt_service(base_dir, host, increment)
     if 'postgres' in services:
         add_postgres_service(base_dir, host)
-    print(answers)
+    print(building)
 
 
 # *** Menu Helper Functions ***
-def generate_checkbox_choices(list, checked=False):
+def generate_cb_choices(list, checked=False):
     """Generates checkbox entries for lists of strings
 
     :list: pyhton list that shall be converted
@@ -1041,21 +999,14 @@ def docker_client_prompt(message_details=''):
     :manager: Optional machine to use, prompt otherwise
     :returns: Docker client instance
     """
-    questions = [
-        {
-            'type': 'list',
-            'name': 'machine',
-            'message': f'Choose manager machine{message_details}',
-            'choices': get_machine_list()
-        }
-    ]
-    answers = prompt(questions)
-    return answers['machine']
-# }}}
+    machine = qust.select(f'Choose manager machine{message_details}',
+                          choices=get_machine_list(), style=st).ask()
+    return machine
+# >>>
 
 
 # ******************************
-# Script main ( entry) {{{
+# Script main (entry) <<<
 # ******************************
 if __name__ == '__main__':
     import argparse
@@ -1123,7 +1074,7 @@ if __name__ == '__main__':
         args.func(args)
     except AttributeError:
         interactive_command(args)
-# }}}
+# >>>
 
 # --- vim settings ---
-# vim:foldmethod=marker:foldlevel=0
+# vim:foldmethod=marker:foldlevel=0:foldmarker=<<<,>>>

@@ -84,16 +84,14 @@ The setup also expects a working docker-machine environment. To connect all inst
 **Python:**
 
 ```sh
-docker
-PyInquirer
-pyyaml
-bcrypt
-pip-tools
+docker			# Docker client library
+questionary		# Prompt library
+ruamel.yaml		# Yaml library that preserves structure
+bcrypt			# generate bcrypt hashes
+pip-tools		# manage requirements (Optional)
 ```
 
-All python requirements managed using `pip-tool` in the `requirements.in` file. The command `pip-compile`  generates a `requirements.txt` file that  can be used with with `pip install--user -r requirements.txt`  to install all needed python dependencies. E.g. on Ubuntu you can execute the following:
-
-
+All python requirements managed using `pip-tool` in the `requirements.in` file. The command `pip-compile`  generates a `requirements.txt` file that  can be used with with `pip ` to install all needed python dependencies. E.g. on Ubuntu you can execute the following:
 
 ```
 pip3 install --user -r requirements.txt
