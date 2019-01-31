@@ -861,6 +861,8 @@ def main_menu(args):
         init_menu(args)
     elif 'Execute' in choice:
         exec_menu(args)
+    elif 'User' in choice:
+        user_menu(args)
 
     return choice
 
@@ -878,13 +880,14 @@ def load_main_entires(base_dir):
         entries.append('Create initial structure')
     else:
         entries.append('Execute a command in a service container')
+        entries.append('Manage Users')
 
     entries.append('Exit')
 
     return entries
 
 
-# *** Main Menu Entries ***
+# *** Init Menu Entries ***
 def init_menu(args):
     """Menu entry for initial setup and file generation
 
@@ -940,21 +943,6 @@ def init_menu(args):
         generate_swarm(hosts)
 
 
-def exec_menu(args):
-    """Menu entry for executing commands in services
-
-    :args: Passed commandline arguments
-    """
-    machine = docker_client_prompt(" to execute command at")
-    service_name = qust.select(
-        'Which service container shall execute the command?',
-        choices=get_container_list(machine), style=st).ask()
-    command = qust.text('What command should be executed?', style=st).ask()
-
-    run_command_in_service(service_name, command, machine)
-
-
-# *** Sub Menu Entries ***
 def init_machine_menu(base_dir, host, increment):
     """Prompts to select server services
 
@@ -980,6 +968,33 @@ def init_machine_menu(base_dir, host, increment):
     if 'postgres' in services:
         add_postgres_service(base_dir, host)
     print(building)
+
+
+# *** Exec Menu Entries ***
+def exec_menu(args):
+    """Menu entry for executing commands in services
+
+    :args: Passed commandline arguments
+    """
+    machine = docker_client_prompt(" to execute command at")
+    service_name = qust.select(
+        'Which service container shall execute the command?',
+        choices=get_container_list(machine), style=st).ask()
+    command = qust.text('What command should be executed?', style=st).ask()
+
+    run_command_in_service(service_name, command, machine)
+
+
+# *** User Menu Entries ***
+def user_menu(args):
+    """Menu entry for user managment
+
+    :args: Passed commandline arguments
+    """
+    choice = qust.select("What do you want to do?", choices=[
+                         'Add a new user', 'Remove existing user'],
+                         style=st).ask()
+    print(choice)
 
 
 # *** Menu Helper Functions ***
