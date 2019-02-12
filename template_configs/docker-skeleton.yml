@@ -37,6 +37,10 @@ configs:
         file: ./postgres/user
     postgres_passwd:
         file: ./postgres/passwd
+    landing_logo:
+        file: ./pb-framr/logo.svg
+    landing_pages:
+        file: ./pb-framr/pages.json
 
 volumes:
     openhab_addons:
@@ -68,6 +72,28 @@ services:
               target: /etc/traefik/traefik_users
         deploy:
             mode: global
+            placement:
+                constraints:
+                    - node.role == manager
+    landing:
+        image: doblix/pb-framr
+        networks:
+          - habnet
+        configs:
+          - source: landing_logo
+            target: /usr/share/nginx/html/logo.svg
+          - source: landing_pages
+            target: /usr/share/nginx/html/pages.json
+        deploy:
+            labels:
+              - traefik.docker.network=habnet
+              - traefik.port=80
+              - traefik.backend=landing
+              - traefik.main.frontend.priority=2
+              - traefik.main.frontend.redirect.regex=^(.*)/landing$$
+              - traefik.main.frontend.redirect.replacement=$$1/landing/
+              - traefik.main.frontend.rule=PathPrefix:/landing;ReplacePathRegex:^/landing/(.*)
+                /$$1
             placement:
                 constraints:
                     - node.role == manager

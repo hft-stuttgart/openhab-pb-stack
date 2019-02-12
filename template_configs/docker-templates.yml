@@ -37,6 +37,10 @@ configs:
         file: ./postgres/user
     postgres_passwd:
         file: ./postgres/passwd
+    landing_logo:
+        file: ./pb-framr/logo.svg
+    landing_pages:
+        file: ./pb-framr/pages.json
 
 volumes:
     openhab_addons:

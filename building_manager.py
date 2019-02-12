@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """ Python module to assist creating and maintaining docker openHab stacks."""
 import crypt
+from enum import Enum
 import logging
 import os
 from hashlib import md5
@@ -42,10 +43,11 @@ COMPOSE_NAME = 'docker-stack.yml'
 SKELETON_NAME = 'docker-skeleton.yml'
 TEMPLATES_NAME = 'docker-templates.yml'
 CONFIG_DIRS = ['mosquitto', 'nodered', 'ssh',
-               'traefik', 'volumerize', 'postgres']
+               'traefik', 'volumerize', 'postgres', 'pb-framr']
 TEMPLATE_FILES = [
     'mosquitto/mosquitto.conf', 'nodered/nodered_package.json',
-    'nodered/nodered_settings.js', 'ssh/sshd_config', 'traefik/traefik.toml'
+    'pb-framr/logo.svg', 'nodered/nodered_settings.js',
+    'ssh/sshd_config', 'traefik/traefik.toml'
 ]
 EDIT_FILES = {
     "mosquitto_passwords": "mosquitto/mosquitto_passwords",
@@ -56,7 +58,8 @@ EDIT_FILES = {
     "known_hosts": "ssh/known_hosts",
     "backup_config": "volumerize/backup_config.json",
     "postgres_user": "postgres/user",
-    "postgres_passwd": "postgres/passwd"
+    "postgres_passwd": "postgres/passwd",
+    "pb_framr_pages": "pb-framr/pages.json"
 }
 CONSTRAINTS = {"building": "node.labels.building"}
 SERVICES = {
@@ -66,6 +69,10 @@ SERVICES = {
     "postgres": "postgres_X",
     "mqtt": "mqtt_X"
 }
+FRONTEND_SERVICES = {
+    "openhab": "OpenHAB",
+    "nodered": "Node-RED"
+}
 
 # Default Swarm port
 SWARM_PORT = 2377
@@ -73,6 +80,22 @@ SWARM_PORT = 2377
 UID = 9001
 # Username for admin
 ADMIN_USER = 'ohadmin'
+
+
+class Service(Enum):
+    SFTP = ("SFTP", "sftp_X", False)
+    OPENHAB = ("OpenHAB", "openhab_X", True, '/', 'dashboard')
+    NODERED = ("Node-RED", "nodered_X", True, 'nodered', 'ballot')
+    POSTGRES = ("Postgre SQL", "postgres_X", False)
+    MQTT = ("Mosquitto MQTT Broker", "mqtt_X", False)
+
+    def __init__(self, fullname, compose_entry, frontend,
+                 prefix=None, icon=None):
+        self.fullname = fullname
+        self.compose_entry = compose_entry
+        self.frontend = frontend
+        self.prefix = prefix
+        self.icon = icon
 # >>>
 
 
@@ -399,6 +422,25 @@ def generate_traefik_user_line(username, password):
     return line
 
 
+def generate_pb_framr_entry(host, service):
+    """Generates a single entry of the framr file
+
+    :host: host this entry is intended for
+    :service: entry from service enum
+    :returns: a dict fitting the asked entry
+
+    """
+    entry = {}
+    entry['title'] = service.fullname
+    if service.prefix == "/":
+        entry['url'] = f'http://{host}/'
+        pass
+    else:
+        entry['url'] = f'/{service.prefix}_{host}'
+    entry['icon'] = service.icon
+    return entry
+
+
 def generate_mosquitto_file(base_dir, username, password):
     """Generates a mosquitto password file using mosquitto_passwd system tool
 
@@ -531,6 +573,26 @@ def generate_volumerize_file(base_dir, hosts):
         base_dir, EDIT_FILES['backup_config'], configs, json=True)
 
 
+def generate_pb_framr_file(base_dir, frames):
+    """Generates config for pb framr landing page
+
+    :base_dir: path that contains custom config folder
+    :frames: a dict that contains hosts with matching name and services
+    """
+    configs = []
+
+    for f in frames:
+        building = {
+            'instance': f['building'],
+            'entries': [generate_pb_framr_entry(f['host'], s)
+                        for s in f['services'] if s.frontend]
+        }
+        configs.append(building)
+
+    create_or_replace_config_file(
+        base_dir, EDIT_FILES['pb_framr_pages'], configs, json=True)
+
+
 def create_or_replace_config_file(base_dir, config_path, content, json=False):
     """Creates or replaces a config file with new content
 
@@ -545,8 +607,6 @@ def create_or_replace_config_file(base_dir, config_path, content, json=False):
             json.dump(content, file, indent=2)
         else:
             file.write(content)
-
-
 # >>>
 
 
@@ -929,8 +989,15 @@ def init_menu(args):
     generate_id_rsa_files(base_dir)
     generate_host_key_files(base_dir, hosts)
 
+    frames = []
     for i, host in enumerate(hosts):
-        init_machine_menu(base_dir, host, i)
+        building, services = init_machine_menu(base_dir, host, i)
+        frames.append({'host': host,
+                       'building': building, 'services': services})
+
+    # When frames is not empty generate frame config
+    if frames:
+        generate_pb_framr_file(base_dir, frames)
 
     # print(answers)
     print(f"Configuration files for {stack_name} generated in {base_dir}")
@@ -949,25 +1016,25 @@ def init_machine_menu(base_dir, host, increment):
     :base_dir: Directory of config files
     :host: docker-machine host
     :increment: incrementing number to ensure ports are unique
+    :return: choosen building name and services
     """
     # Prompt for services
     building = qust.text(f'Choose a name for building on server {host}',
                          default=f'{host}', style=st).ask()
     services = qust.checkbox(f'What services shall {host} provide?',
-                             choices=generate_cb_choices(SERVICES.keys(),
-                                                         checked=True),
+                             choices=generate_cb_service_choices(checked=True),
                              style=st).ask()
-    if 'sftp' in services:
+    if Service.SFTP in services:
         add_sftp_service(base_dir, host, increment)
-    if 'openhab' in services:
+    if Service.OPENHAB in services:
         add_openhab_service(base_dir, host)
-    if 'nodered' in services:
+    if Service.NODERED in services:
         add_nodered_service(base_dir, host)
-    if 'mqtt' in services:
+    if Service.MQTT in services:
         add_mqtt_service(base_dir, host, increment)
-    if 'postgres' in services:
+    if Service.POSTGRES in services:
         add_postgres_service(base_dir, host)
-    print(building)
+    return building, services
 
 
 # *** Exec Menu Entries ***
@@ -1006,6 +1073,17 @@ def generate_cb_choices(list, checked=False):
     :returns: A list of dicts with name keys
     """
     return [{'name': m, 'checked': checked} for m in list]
+
+
+def generate_cb_service_choices(checked=False):
+    """Generates checkbox entries for the sevice enum
+
+    :checked: if true, selections will be checked by default
+    :returns: A list of dicts with name keys
+    """
+    return [
+        {'name': s.fullname, 'value': s, 'checked': checked} for s in Service
+    ]
 
 
 def docker_client_prompt(message_details=''):
