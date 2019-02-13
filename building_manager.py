@@ -1112,11 +1112,12 @@ def user_menu(args):
 
     # Ask for action
     choice = qust.select("What do you want to do?", choices=[
-                         'Add a new user', 'Remove existing user'],
+                         'Add a new user', 'Modify existing user'],
                          style=st).ask()
     if "Add" in choice:
         new_user_menu(base_dir)
-    print(choice)
+    elif "Modify" in choice:
+        modify_user_menu(base_dir)
 
 
 def new_user_menu(base_dir):
@@ -1146,6 +1147,17 @@ def new_user_menu(base_dir):
             print("Passwords did not match, try again")
 
     add_user_to_traefik_file(base_dir, username, password)
+
+
+def modify_user_menu(base_dir):
+    """Menu entry to remove users or delete passwords
+
+    :base_dir: Directory of config files
+    """
+    current_users = get_users_from_files(base_dir)
+    qust.select("Choose user to modify:",
+                choices=current_users, style=st).ask()
+    pass
 
 
 # *** Menu Helper Functions ***
