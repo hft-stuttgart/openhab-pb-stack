@@ -594,6 +594,65 @@ def create_or_replace_config_file(base_dir, config_path, content, json=False):
             json.dump(content, file, indent=2)
         else:
             file.write(content)
+
+
+# Functions to modify existing files
+def add_user_to_traefik_file(base_dir, username, password):
+    """Adds or modifies user in traefik file
+
+    :base_dir: path that contains custom config folder
+    :username: username to use
+    :password: password that will be used
+    """
+    # generate line and save it into a file
+    users = get_traefik_users(base_dir)
+    # ensure to delete old entry if user exists
+    users = [u for u in users if u['username'] is not username]
+    # collect existing users lines
+    user_lines = []
+    for u in users:
+        user_lines.append(f"{u['username']}:{u['password']}")
+    # add new/modified user
+    user_lines.append(generate_traefik_user_line(username, password))
+    # generate content
+    file_content = "\n".join(user_lines)
+    create_or_replace_config_file(base_dir, EDIT_FILES['traefik_users'],
+                                  file_content)
+
+
+# Functions to get content from files
+def get_users_from_files(base_dir):
+    """Gets a list of users in files
+
+    :base_dir: dir to find files in
+    :returns: list of users
+    """
+    users = []
+
+    # add treafik users
+    users.extend([u['username'] for u in get_traefik_users(base_dir)])
+
+    return users
+
+
+def get_traefik_users(base_dir):
+    """Gets a list of dicts containing users and password hashes
+
+    :base_dir: dir to find files in
+    :returns: list of users / password dicts
+    """
+    users = []
+
+    # get treafik users
+    traefik_file = f"{base_dir}/{CUSTOM_DIR}/{EDIT_FILES['traefik_users']}"
+    with open(traefik_file, 'r') as file:
+        lines = file.read().splitlines()
+        for line in lines:
+            # username in traefik file is first entry unitl colon
+            username = line.split(':')[0]
+            password = line.split(':')[1]
+            users.append({"username": username, "password": password})
+    return users
 # >>>
 
 
@@ -1045,10 +1104,48 @@ def user_menu(args):
 
     :args: Passed commandline arguments
     """
+    # Base directory for configs
+    base_dir = args.base_dir
+
+    if base_dir is None:
+        base_dir = os.getcwd()
+
+    # Ask for action
     choice = qust.select("What do you want to do?", choices=[
                          'Add a new user', 'Remove existing user'],
                          style=st).ask()
+    if "Add" in choice:
+        new_user_menu(base_dir)
     print(choice)
+
+
+def new_user_menu(base_dir):
+    """Menu entry for new users
+
+    :base_dir: Directory of config files
+    """
+    current_users = get_users_from_files(base_dir)
+    new_user = False
+    while not new_user:
+        username = qust.text("Choose a new username:", style=st).ask()
+        if username not in current_users:
+            new_user = True
+        else:
+            print(f"User with name {username} already exists, try again")
+
+    # Ensure passwords match
+    password_match = False
+    while not password_match:
+        password = qust.password(
+            f'Choose a password for the user {username}:', style=st).ask()
+        confirm = qust.password(
+            f'Repeat password for the user {username}:', style=st).ask()
+        if password == confirm:
+            password_match = True
+        else:
+            print("Passwords did not match, try again")
+
+    add_user_to_traefik_file(base_dir, username, password)
 
 
 # *** Menu Helper Functions ***
