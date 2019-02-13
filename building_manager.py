@@ -605,9 +605,9 @@ def add_user_to_traefik_file(base_dir, username, password):
     :password: password that will be used
     """
     # generate line and save it into a file
-    users = get_traefik_users(base_dir)
+    current_users = get_traefik_users(base_dir)
     # ensure to delete old entry if user exists
-    users = [u for u in users if u['username'] is not username]
+    users = [u for u in current_users if u['username'] != username]
     # collect existing users lines
     user_lines = []
     for u in users:
@@ -1155,12 +1155,30 @@ def modify_user_menu(base_dir):
     :base_dir: Directory of config files
     """
     current_users = get_users_from_files(base_dir)
-    qust.select("Choose user to modify:",
-                choices=current_users, style=st).ask()
-    pass
+    user = qust.select("Choose user to modify:",
+                       choices=current_users, style=st).ask()
 
+    action = qust.select(f"What should we do with {user}?", choices=[
+        'Delete user', 'Change password'], style=st).ask()
+
+    if 'Delete' in action:
+        pass
+    elif 'Change' in action:
+        password_match = False
+        while not password_match:
+            password = qust.password(
+                f'Choose a password for the user {user}:', style=st).ask()
+            confirm = qust.password(
+                f'Repeat password for the user {user}:', style=st).ask()
+            if password == confirm:
+                password_match = True
+            else:
+                print("Passwords did not match, try again")
+    add_user_to_traefik_file(base_dir, user, password)
 
 # *** Menu Helper Functions ***
+
+
 def generate_cb_choices(list, checked=False):
     """Generates checkbox entries for lists of strings
 
