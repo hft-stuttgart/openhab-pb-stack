@@ -7,8 +7,8 @@ networks:
         attachable: true
 
 configs:
-    backup_config_X:
-        file: ./volumerize/backup_config_X.json
+    backup_config:
+        file: ./volumerize/backup_config.json
     sftp_config:
         file: ./ssh/sshd_config
     sftp_users:
@@ -54,7 +54,7 @@ volumes:
     backup_cache:
 
 services:
-    backup_X:
+    backup:
         image: blacklabelops/volumerize
         volumes:
             - "openhab_userdata:/source/openhab_userdata"
@@ -83,7 +83,7 @@ services:
             placement:
                 constraints:
                     - node.labels.building == X
-    sftp_X:
+    sftp:
         image: "atmoz/sftp"
         volumes:
             - "openhab_userdata:/home/ohadmin/openhab_userdata"
@@ -110,7 +110,7 @@ services:
             placement:
                 constraints:
                     - node.labels.building == X
-    openhab_X:
+    openhab:
         image: "openhab/openhab:2.4.0-amd64-debian"
         volumes:
             - "/etc/localtime:/etc/localtime:ro"
@@ -130,7 +130,7 @@ services:
             placement:
                 constraints:
                     - node.labels.building == X
-    nodered_X:
+    nodered:
         image: "nodered/node-red-docker"
         volumes:
             - "nodered_data:/data"
@@ -148,7 +148,7 @@ services:
             placement:
                 constraints:
                     - node.labels.building == X
-    mqtt_X:
+    mqtt:
         image: "eclipse-mosquitto"
         volumes:
             - "mosquitto_data:/mosquitto/data"
@@ -164,7 +164,7 @@ services:
             placement:
                 constraints:
                     - node.labels.building == X
-    db_X:
+    db:
         image: "influxdb"
         volumes:
             - "influxdb_data:/var/lib/influxdb"
@@ -187,7 +187,7 @@ services:
             placement:
                 constraints:
                     - node.labels.building == X
-    postgres_X:
+    postgres:
         image: "postgres"
         volumes:
             - "postgres_data:/var/lib/postgresql/data/pgdata"

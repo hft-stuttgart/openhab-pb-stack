@@ -63,11 +63,11 @@ EDIT_FILES = {
 }
 CONSTRAINTS = {"building": "node.labels.building"}
 SERVICES = {
-    "sftp": "sftp_X",
-    "openhab": "openhab_X",
-    "nodered": "nodered_X",
-    "postgres": "postgres_X",
-    "mqtt": "mqtt_X"
+    "sftp": "sftp",
+    "openhab": "openhab",
+    "nodered": "nodered",
+    "postgres": "postgres",
+    "mqtt": "mqtt"
 }
 FRONTEND_SERVICES = {
     "openhab": "OpenHAB",
