@@ -62,17 +62,6 @@ EDIT_FILES = {
     "pb_framr_pages": "pb-framr/pages.json"
 }
 CONSTRAINTS = {"building": "node.labels.building"}
-SERVICES = {
-    "sftp": "sftp",
-    "openhab": "openhab",
-    "nodered": "nodered",
-    "postgres": "postgres",
-    "mqtt": "mqtt"
-}
-FRONTEND_SERVICES = {
-    "openhab": "OpenHAB",
-    "nodered": "Node-RED"
-}
 
 # Default Swarm port
 SWARM_PORT = 2377
@@ -83,18 +72,16 @@ ADMIN_USER = 'ohadmin'
 
 
 class Service(Enum):
-    SFTP = ("SFTP", "sftp_X", False)
-    OPENHAB = ("OpenHAB", "openhab_X", True, '/', 'dashboard')
-    NODERED = ("Node-RED", "nodered_X", True, 'nodered', 'ballot')
-    POSTGRES = ("Postgre SQL", "postgres_X", False)
-    MQTT = ("Mosquitto MQTT Broker", "mqtt_X", False)
+    SFTP = ("SFTP", "sftp", False)
+    OPENHAB = ("OpenHAB", "openhab", True, 'dashboard')
+    NODERED = ("Node-RED", "nodered", True, 'ballot')
+    POSTGRES = ("Postgre SQL", "postgres", False)
+    MQTT = ("Mosquitto MQTT Broker", "mqtt", False)
 
-    def __init__(self, fullname, compose_entry, frontend,
-                 prefix=None, icon=None):
+    def __init__(self, fullname, prefix, frontend, icon=None):
         self.fullname = fullname
-        self.compose_entry = compose_entry
-        self.frontend = frontend
         self.prefix = prefix
+        self.frontend = frontend
         self.icon = icon
 # >>>
 
@@ -132,7 +119,7 @@ def add_sftp_service(base_dir, hostname, number=0):
     # service name
     service_name = f'sftp_{hostname}'
     # template
-    template = get_service_template(base_dir, SERVICES['sftp'])
+    template = get_service_template(base_dir, Service.SFTP.prefix)
     # only label contraint is building
     template['deploy']['placement']['constraints'][0] = (
         f"{CONSTRAINTS['building']} == {hostname}")
@@ -153,7 +140,7 @@ def add_openhab_service(base_dir, hostname):
     # service name
     service_name = f'openhab_{hostname}'
     # template
-    template = get_service_template(base_dir, SERVICES['openhab'])
+    template = get_service_template(base_dir, Service.OPENHAB.prefix)
     # only label contraint is building
     template['deploy']['placement']['constraints'][0] = (
         f"{CONSTRAINTS['building']} == {hostname}")
@@ -185,7 +172,7 @@ def add_nodered_service(base_dir, hostname):
     # service name
     service_name = f'nodered_{hostname}'
     # template
-    template = get_service_template(base_dir, SERVICES['nodered'])
+    template = get_service_template(base_dir, Service.NODERED.prefix)
     # only label contraint is building
     template['deploy']['placement']['constraints'][0] = (
         f"{CONSTRAINTS['building']} == {hostname}")
@@ -212,7 +199,7 @@ def add_mqtt_service(base_dir, hostname, number=0):
     # service name
     service_name = f'mqtt_{hostname}'
     # template
-    template = get_service_template(base_dir, SERVICES['mqtt'])
+    template = get_service_template(base_dir, Service.MQTT.prefix)
     # only label contraint is building
     template['deploy']['placement']['constraints'][0] = (
         f"{CONSTRAINTS['building']} == {hostname}")
@@ -234,7 +221,7 @@ def add_postgres_service(base_dir, hostname):
     # service name
     service_name = f'postgres_{hostname}'
     # template
-    template = get_service_template(base_dir, SERVICES['postgres'])
+    template = get_service_template(base_dir, Service.POSTGRES.prefix)
     # only label contraint is building
     template['deploy']['placement']['constraints'][0] = (
         f"{CONSTRAINTS['building']} == {hostname}")
@@ -432,7 +419,7 @@ def generate_pb_framr_entry(host, service):
     """
     entry = {}
     entry['title'] = service.fullname
-    if service.prefix == "/":
+    if service == Service.OPENHAB:
         entry['url'] = f'http://{host}/'
         pass
     else:

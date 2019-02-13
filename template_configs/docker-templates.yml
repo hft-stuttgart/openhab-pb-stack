@@ -65,7 +65,7 @@ services:
             - "backup_cache:/volumerize-cache"
             - "backup_data:/backup"
         configs:
-            - source: backup_config_X
+            - source: backup_config
               target: /backup_config.json
             - source: sftp_id_key
               target: /root/.ssh/id_rsa
