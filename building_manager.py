@@ -604,7 +604,7 @@ def add_user_to_traefik_file(base_dir, username, password):
     :username: username to use
     :password: password that will be used
     """
-    # generate line and save it into a file
+    # get current users
     current_users = get_traefik_users(base_dir)
     # ensure to delete old entry if user exists
     users = [u for u in current_users if u['username'] != username]
@@ -615,6 +615,26 @@ def add_user_to_traefik_file(base_dir, username, password):
     # add new/modified user
     user_lines.append(generate_traefik_user_line(username, password))
     # generate content
+    file_content = "\n".join(user_lines)
+    create_or_replace_config_file(base_dir, EDIT_FILES['traefik_users'],
+                                  file_content)
+
+
+def remove_user_from_traefik_file(base_dir, username):
+    """Removes user from traefik file
+
+    :base_dir: path that contains custom config folder
+    :username: username to delete
+    """
+    # get current users
+    current_users = get_traefik_users(base_dir)
+    # ensure to delete entry if user exists
+    users = [u for u in current_users if u['username'] != username]
+    # collect other user lines
+    user_lines = []
+    for u in users:
+        user_lines.append(f"{u['username']}:{u['password']}")
+    # generate content and write file
     file_content = "\n".join(user_lines)
     create_or_replace_config_file(base_dir, EDIT_FILES['traefik_users'],
                                   file_content)
@@ -1150,7 +1170,7 @@ def new_user_menu(base_dir):
 
 
 def modify_user_menu(base_dir):
-    """Menu entry to remove users or delete passwords
+    """Menu entry to remove users or change passwords
 
     :base_dir: Directory of config files
     """
@@ -1158,11 +1178,21 @@ def modify_user_menu(base_dir):
     user = qust.select("Choose user to modify:",
                        choices=current_users, style=st).ask()
 
-    action = qust.select(f"What should we do with {user}?", choices=[
-        'Delete user', 'Change password'], style=st).ask()
+    if user == 'ohadmin':
+        choices = [{'name': 'Delete user',
+                    'disabled': 'Disabled: cannot delete admin user'},
+                   'Change password', 'Exit']
+    else:
+        choices = ['Delete user', 'Change password', 'Exit']
+
+    action = qust.select(
+        f"What should we do with {user}?", choices=choices, style=st).ask()
 
     if 'Delete' in action:
-        pass
+        is_sure = qust.confirm(
+            f"Are you sure you want to delete user {user}?", style=st).ask()
+        if is_sure:
+            remove_user_from_traefik_file(base_dir, user)
     elif 'Change' in action:
         password_match = False
         while not password_match:
@@ -1174,11 +1204,10 @@ def modify_user_menu(base_dir):
                 password_match = True
             else:
                 print("Passwords did not match, try again")
-    add_user_to_traefik_file(base_dir, user, password)
+        add_user_to_traefik_file(base_dir, user, password)
+
 
 # *** Menu Helper Functions ***
-
-
 def generate_cb_choices(list, checked=False):
     """Generates checkbox entries for lists of strings
 
