@@ -227,3 +227,14 @@ services:
             placement:
                 constraints:
                     - node.role == manager
+    zwave_oh:
+        image: docker
+        command: "docker run --rm --name device_oh --network habnet -v /etc/localtime:/etc/localtime:ro -v /etc/timezone:/etc/timezone:ro -v openhab_zwave_conf:/openhab/conf -v openhab_zwave_userdata:/openhab/userdata -p 9898:8080 openhab/openhab:2.4.0"
+        volumes:
+            - "/var/run/docker.sock:/var/run/docker.sock"
+        networks:
+            - habnet
+        deploy:
+            placement:
+                constraints:
+                    - node.labels.device == zwave

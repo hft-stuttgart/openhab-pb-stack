@@ -1299,7 +1299,8 @@ def service_add_menu(base_dir):
         'Input an all lower case identifier:', style=st).ask()
 
     if service and host and identifier:
-        add_postgres_service(base_dir, host, postfix=identifier)
+        if service == Service.POSTGRES:
+            add_postgres_service(base_dir, host, postfix=identifier)
 
 
 def service_modify_menu(base_dir):
