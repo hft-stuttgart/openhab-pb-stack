@@ -4,6 +4,7 @@ import crypt
 from enum import Enum
 import logging
 import os
+import sys
 from hashlib import md5
 from shutil import copy2
 from subprocess import PIPE, run
@@ -89,6 +90,8 @@ class Service(Enum):
 # ******************************
 # Compose file functions <<<
 # ******************************
+
+# Functions to generate initial file
 def generate_initial_compose(base_dir):
     """Creates the initial compose using the skeleton
 
@@ -222,11 +225,52 @@ def add_postgres_service(base_dir, hostname):
     service_name = f'postgres_{hostname}'
     # template
     template = get_service_template(base_dir, Service.POSTGRES.prefix)
-    # only label contraint is building
+    # only label constraint is building
     template['deploy']['placement']['constraints'][0] = (
         f"{CONSTRAINTS['building']} == {hostname}")
 
     add_or_update_compose_service(compose_path, service_name, template)
+
+
+# Functions to delete services
+def delete_service(base_dir, service_name):
+    """Deletes a service from the compose file
+
+    :base_dir: dir to find files in
+    :returns: list of current services
+    """
+    base_path = base_dir + '/' + CUSTOM_DIR
+    # compose file
+    compose_path = base_path + '/' + COMPOSE_NAME
+    with open(compose_path, 'r+') as compose_f:
+        # load compose file
+        compose = yaml.load(compose_f)
+        # generate list of names
+        compose['services'].pop(service_name, None)
+        # start writing from file start
+        compose_f.seek(0)
+        # write new compose content
+        yaml.dump(compose, compose_f)
+        # reduce file to new size
+        compose_f.truncate()
+
+
+# Functions to extract information
+def get_current_services(base_dir):
+    """Gets a list of currently used services
+
+    :base_dir: dir to find files in
+    :returns: list of current services
+    """
+    base_path = base_dir + '/' + CUSTOM_DIR
+    # compose file
+    compose_path = base_path + '/' + COMPOSE_NAME
+    with open(compose_path, 'r') as compose_f:
+        # load compose file
+        compose = yaml.load(compose_f)
+        # generate list of names
+        service_names = [n for n in compose['services']]
+        return service_names
 
 
 # Helper functions
@@ -979,18 +1023,12 @@ def main_menu(args):
     if base_dir is None:
         base_dir = os.getcwd()
 
-    # Main menu prompts
+    # Main menu prompts selection contains function
     choice = qust.select('Public Building Manager - Main Menu',
                          choices=load_main_entires(base_dir), style=st).ask()
 
-    if 'Create' in choice:
-        init_menu(args)
-    elif 'Execute' in choice:
-        exec_menu(args)
-    elif 'User' in choice:
-        user_menu(args)
-
-    return choice
+    # Call funtion of menu entry
+    choice(args)
 
 
 def load_main_entires(base_dir):
@@ -1003,14 +1041,25 @@ def load_main_entires(base_dir):
 
     entries = []
     if not os.path.exists(custom_path):
-        entries.append('Create initial structure')
+        entries.append({'name': 'Create initial structure',
+                        'value': init_menu})
     else:
-        entries.append('Execute a command in a service container')
-        entries.append('Manage Users')
+        entries.append({'name': 'Manage Services',
+                        'value': service_menu})
+        entries.append({'name': 'Manage Users',
+                        'value': user_menu})
+        entries.append({'name': 'Execute a command in a service container',
+                        'value': exec_menu})
 
-    entries.append('Exit')
+    entries.append({'name': 'Exit', 'value': sys.exit})
 
     return entries
+
+
+def exit_menu(args):
+    """Exits the programm
+    """
+    sys.exit()
 
 
 # *** Init Menu Entries ***
@@ -1132,7 +1181,7 @@ def user_menu(args):
 
     # Ask for action
     choice = qust.select("What do you want to do?", choices=[
-                         'Add a new user', 'Modify existing user'],
+                         'Add a new user', 'Modify existing user', 'Exit'],
                          style=st).ask()
     if "Add" in choice:
         new_user_menu(base_dir)
@@ -1205,6 +1254,51 @@ def modify_user_menu(base_dir):
             else:
                 print("Passwords did not match, try again")
         add_user_to_traefik_file(base_dir, user, password)
+
+
+# *** Service Menu Entries ***
+def service_menu(args):
+    """Menu entry for service managment
+
+    :args: Passed commandline arguments
+    """
+    # Base directory for configs
+    base_dir = args.base_dir
+
+    if base_dir is None:
+        base_dir = os.getcwd()
+
+    # Ask for action
+    choice = qust.select("What do you want to do?", choices=[
+                         'Modify existing services', 'Add additional service',
+                         'Exit'], style=st).ask()
+    if "Add" in choice:
+        pass
+    elif "Modify" in choice:
+        service_modify_menu(base_dir)
+
+
+def service_modify_menu(base_dir):
+    """Menu to modify services
+
+    :base_dir: Directory of config files
+    """
+    services = get_current_services(base_dir)
+    service = qust.select(
+        'What service do you want to modify?', choices=services).ask()
+
+    if service in ['proxy', 'landing']:
+        choices = [{'name': 'Remove service',
+                    'disabled': 'Disabled: cannot remove framework services'},
+                   'Exit']
+    else:
+        choices = ['Remove service', 'Exit']
+
+    action = qust.select(
+        f"What should we do with {service}?", choices=choices, style=st).ask()
+
+    if 'Remove' in action:
+        delete_service(base_dir, service)
 
 
 # *** Menu Helper Functions ***
