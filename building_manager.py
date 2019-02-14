@@ -73,15 +73,16 @@ ADMIN_USER = 'ohadmin'
 
 
 class Service(Enum):
-    SFTP = ("SFTP", "sftp", False)
-    OPENHAB = ("OpenHAB", "openhab", True, 'dashboard')
-    NODERED = ("Node-RED", "nodered", True, 'ballot')
-    POSTGRES = ("Postgre SQL", "postgres", False)
-    MQTT = ("Mosquitto MQTT Broker", "mqtt", False)
+    SFTP = ("SFTP", "sftp", False, False)
+    OPENHAB = ("OpenHAB", "openhab", True, True, 'dashboard')
+    NODERED = ("Node-RED", "nodered", False, True, 'ballot')
+    POSTGRES = ("Postgre SQL", "postgres", True, False)
+    MQTT = ("Mosquitto MQTT Broker", "mqtt", True, False)
 
-    def __init__(self, fullname, prefix, frontend, icon=None):
+    def __init__(self, fullname, prefix, additional, frontend, icon=None):
         self.fullname = fullname
         self.prefix = prefix
+        self.additional = additional
         self.frontend = frontend
         self.icon = icon
 # >>>
@@ -212,17 +213,20 @@ def add_mqtt_service(base_dir, hostname, number=0):
     add_or_update_compose_service(compose_path, service_name, template)
 
 
-def add_postgres_service(base_dir, hostname):
+def add_postgres_service(base_dir, hostname, postfix=None):
     """Generates an postgres entry and adds it to the compose file
 
     :base_dir: base directory for configuration files
     :hostname: names of host that the services is added to
+    :postfix: an identifier for this service
     """
     base_path = base_dir + '/' + CUSTOM_DIR
     # compose file
     compose_path = base_path + '/' + COMPOSE_NAME
+    # use hostname as postfix when empty
+    postfix = hostname if postfix is None else postfix
     # service name
-    service_name = f'postgres_{hostname}'
+    service_name = f'postgres_{postfix}'
     # template
     template = get_service_template(base_dir, Service.POSTGRES.prefix)
     # only label constraint is building
@@ -1273,9 +1277,29 @@ def service_menu(args):
                          'Modify existing services', 'Add additional service',
                          'Exit'], style=st).ask()
     if "Add" in choice:
-        pass
+        service_add_menu(base_dir)
     elif "Modify" in choice:
         service_modify_menu(base_dir)
+
+
+def service_add_menu(base_dir):
+    """Menu to add additional services
+
+    :base_dir: Directory of config files
+    """
+    services = [s for s in Service if s.additional]
+    service = qust.select(
+        'What service do you want to add?', style=st,
+        choices=generate_cb_service_choices(service_list=services)).ask()
+
+    host = qust.select('Where should the service be located?',
+                       choices=generate_cb_choices(
+                           get_machine_list()), style=st).ask()
+    identifier = qust.text(
+        'Input an all lower case identifier:', style=st).ask()
+
+    if service and host and identifier:
+        add_postgres_service(base_dir, host, postfix=identifier)
 
 
 def service_modify_menu(base_dir):
@@ -1312,14 +1336,16 @@ def generate_cb_choices(list, checked=False):
     return [{'name': m, 'checked': checked} for m in list]
 
 
-def generate_cb_service_choices(checked=False):
+def generate_cb_service_choices(checked=False, service_list=None):
     """Generates checkbox entries for the sevice enum
 
     :checked: if true, selections will be checked by default
+    :service_list: optional list of services, use all if empty
     :returns: A list of dicts with name keys
     """
+    services = service_list if service_list is not None else Service
     return [
-        {'name': s.fullname, 'value': s, 'checked': checked} for s in Service
+        {'name': s.fullname, 'value': s, 'checked': checked} for s in services
     ]
 
 
