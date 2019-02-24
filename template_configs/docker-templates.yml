@@ -227,6 +227,20 @@ services:
             placement:
                 constraints:
                     - node.role == manager
+    files:
+        image: filebrowser/filebrowser
+        volumes:
+            - openhab_conf:/srv/openHAB
+            - nodered_data:/srv/Node-RED
+        networks:
+            - habnet
+        deploy:
+            labels:
+                - "traefik.port=80"
+                - "traefik.docker.network=habnet"
+            placement:
+                constraints:
+                    - node.labels.building == X
     zwave_oh:
         image: docker
         command: "docker run --rm --name device_oh --network habnet -v /etc/localtime:/etc/localtime:ro -v /etc/timezone:/etc/timezone:ro -v openhab_zwave_conf:/openhab/conf -v openhab_zwave_userdata:/openhab/userdata -p 9898:8080 openhab/openhab:2.4.0"

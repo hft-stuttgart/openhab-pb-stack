@@ -78,6 +78,7 @@ class Service(Enum):
     NODERED = ("Node-RED", "nodered", False, True, 'ballot')
     POSTGRES = ("Postgre SQL", "postgres", True, False)
     MQTT = ("Mosquitto MQTT Broker", "mqtt", True, False)
+    FILES = ("File Manager", "files", False, True, 'folder')
 
     def __init__(self, fullname, prefix, additional, frontend, icon=None):
         self.fullname = fullname
@@ -236,6 +237,32 @@ def add_postgres_service(base_dir, hostname, postfix=None):
     add_or_update_compose_service(compose_path, service_name, template)
 
 
+def add_file_service(base_dir, hostname):
+    """Generates an file manager entry and adds it to the compose file
+
+    :base_dir: base directory for configuration files
+    :hostname: names of host that the services is added to
+    """
+    base_path = base_dir + '/' + CUSTOM_DIR
+    # compose file
+    compose_path = base_path + '/' + COMPOSE_NAME
+    # service name
+    service_name = f'files_{hostname}'
+    # template
+    template = get_service_template(base_dir, Service.FILES.prefix)
+    # add command that sets base url
+    template['command'] = f'-b /{service_name}'
+    # only label contraint is building
+    template['deploy']['placement']['constraints'][0] = (
+        f"{CONSTRAINTS['building']} == {hostname}")
+    template['deploy']['labels'].append(f'traefik.backend={service_name}')
+    template['deploy']['labels'].extend(
+        generate_traefik_path_labels(service_name, segment='main',
+                                     redirect=False))
+
+    add_or_update_compose_service(compose_path, service_name, template)
+
+
 # Functions to delete services
 def delete_service(base_dir, service_name):
     """Deletes a service from the compose file
@@ -329,12 +356,14 @@ def generate_traefik_subdomain_labels(subdomain, segment=None, priority=2):
     return label_list
 
 
-def generate_traefik_path_labels(url_path, segment=None, priority=2):
+def generate_traefik_path_labels(url_path, segment=None, priority=2,
+                                 redirect=True):
     """Generates a traefik path url with necessary redirects
 
     :url_path: path that should be used for the site
     :segment: Optional traefik segment when using multiple rules
     :priority: Priority of frontend rule
+    :redirect: Redirect to path with trailing slash
     :returns: list of labels for traefik
     """
     label_list = []
@@ -342,13 +371,17 @@ def generate_traefik_path_labels(url_path, segment=None, priority=2):
     segment = f'.{segment}' if segment is not None else ''
     # fill list
     label_list.append(f'traefik{segment}.frontend.priority={priority}')
-    label_list.append(
-        f'traefik{segment}.frontend.redirect.regex=^(.*)/{url_path}$$')
-    label_list.append(
-        f'traefik{segment}.frontend.redirect.replacement=$$1/{url_path}/')
-    label_list.append(
-        f'traefik{segment}.frontend.rule=PathPrefix:/{url_path};'
-        f'ReplacePathRegex:^/{url_path}/(.*) /$$1')
+    if redirect:
+        label_list.append(
+            f'traefik{segment}.frontend.redirect.regex=^(.*)/{url_path}$$')
+        label_list.append(
+            f'traefik{segment}.frontend.redirect.replacement=$$1/{url_path}/')
+        label_list.append(
+            f'traefik{segment}.frontend.rule=PathPrefix:/{url_path};'
+            f'ReplacePathRegex:^/{url_path}/(.*) /$$1')
+    else:
+        label_list.append(
+            f'traefik{segment}.frontend.rule=PathPrefix:/{url_path}')
     return label_list
 
 
@@ -471,7 +504,7 @@ def generate_pb_framr_entry(host, service):
         entry['url'] = f'http://{host}/'
         pass
     else:
-        entry['url'] = f'/{service.prefix}_{host}'
+        entry['url'] = f'/{service.prefix}_{host}/'
     entry['icon'] = service.icon
     return entry
 
@@ -1153,6 +1186,8 @@ def init_machine_menu(base_dir, host, increment):
         add_mqtt_service(base_dir, host, increment)
     if Service.POSTGRES in services:
         add_postgres_service(base_dir, host)
+    if Service.FILES in services:
+        add_file_service(base_dir, host)
     return building, services
 
 
@@ -1185,8 +1220,8 @@ def user_menu(args):
 
     # Ask for action
     choice = qust.select("What do you want to do?", choices=[
-                         'Add a new user', 'Modify existing user', 'Exit'],
-                         style=st).ask()
+        'Add a new user', 'Modify existing user', 'Exit'],
+        style=st).ask()
     if "Add" in choice:
         new_user_menu(base_dir)
     elif "Modify" in choice:
@@ -1274,8 +1309,8 @@ def service_menu(args):
 
     # Ask for action
     choice = qust.select("What do you want to do?", choices=[
-                         'Modify existing services', 'Add additional service',
-                         'Exit'], style=st).ask()
+        'Modify existing services', 'Add additional service',
+        'Exit'], style=st).ask()
     if "Add" in choice:
         service_add_menu(base_dir)
     elif "Modify" in choice:
