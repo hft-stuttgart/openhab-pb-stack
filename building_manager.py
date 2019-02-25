@@ -43,7 +43,7 @@ TEMPLATE_DIR = 'template_configs'
 COMPOSE_NAME = 'docker-stack.yml'
 SKELETON_NAME = 'docker-skeleton.yml'
 TEMPLATES_NAME = 'docker-templates.yml'
-CONFIG_DIRS = ['mosquitto', 'nodered', 'ssh',
+CONFIG_DIRS = ['mosquitto', 'nodered', 'ssh', 'filebrowser',
                'traefik', 'volumerize', 'postgres', 'pb-framr']
 TEMPLATE_FILES = [
     'mosquitto/mosquitto.conf', 'nodered/nodered_package.json',
@@ -60,7 +60,8 @@ EDIT_FILES = {
     "backup_config": "volumerize/backup_config.json",
     "postgres_user": "postgres/user",
     "postgres_passwd": "postgres/passwd",
-    "pb_framr_pages": "pb-framr/pages.json"
+    "pb_framr_pages": "pb-framr/pages.json",
+    "filebrowser_conf": "filebrowser/filebrowser.json"
 }
 CONSTRAINTS = {"building": "node.labels.building"}
 
@@ -485,8 +486,8 @@ def generate_traefik_user_line(username, password):
 
     :returns: a line as expected by traefik
     """
-    password_hash = bcrypt.hashpw(password.encode(), bcrypt.gensalt())
-    line = f"{username}:{password_hash.decode()}"
+    password_hash = get_bcrypt_hash(password)
+    line = f"{username}:{password_hash}"
     return line
 
 
@@ -607,6 +608,27 @@ def generate_host_key_files(base_dir, hosts):
                                   known_line)
 
     return id_result.returncode == 0
+
+
+def generate_filebrowser_file(base_dir, username, password):
+    """Generates a configuration for the filebrowser web app
+
+    :base_dir: path that contains custom config folder
+    :username: username to use
+    :password: password that will be used
+    """
+    # generate line and save it into a file
+    file_content = {
+        "port": "80",
+        "address": "",
+        "username": f"{username}",
+        "password": f"{get_bcrypt_hash(password)}",
+        "log": "stdout",
+        "root": "/srv"
+    }
+
+    create_or_replace_config_file(base_dir, EDIT_FILES['filebrowser_conf'],
+                                  file_content, json=True)
 
 
 def generate_traefik_file(base_dir, username, password):
@@ -754,6 +776,18 @@ def get_traefik_users(base_dir):
             password = line.split(':')[1]
             users.append({"username": username, "password": password})
     return users
+
+
+# Additional helper functions
+def get_bcrypt_hash(password):
+    """Returns bcrypt hash for a password
+
+    :password: password to hash
+    :returns: bcrypt hash of password
+
+    """
+    return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+
 # >>>
 
 
@@ -1138,6 +1172,7 @@ def init_menu(args):
     generate_mosquitto_file(base_dir, username, password)
     generate_traefik_file(base_dir, username, password)
     generate_volumerize_file(base_dir, hosts)
+    generate_filebrowser_file(base_dir, username, password)
     generate_id_rsa_files(base_dir)
     generate_host_key_files(base_dir, hosts)
 

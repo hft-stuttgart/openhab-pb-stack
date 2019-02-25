@@ -41,6 +41,8 @@ configs:
         file: ./pb-framr/logo.svg
     landing_pages:
         file: ./pb-framr/pages.json
+    filebrowser:
+        file: ./filebrowser/filebrowser.json
 
 volumes:
     openhab_addons:
@@ -232,6 +234,9 @@ services:
         volumes:
             - openhab_conf:/srv/openHAB
             - nodered_data:/srv/Node-RED
+        configs:
+            - source: filebrowser
+              target: /.filebrowser.json
         networks:
             - habnet
         deploy:
