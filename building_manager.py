@@ -72,6 +72,12 @@ UID = 9001
 # Username for admin
 ADMIN_USER = 'ohadmin'
 
+# USB DEVICES (e.g. Zwave stick)
+USB_DEVICES = [{
+    "name": "Aeotec Z-Stick Gen5 (ttyACM0)",
+    "value": "zwave_stick"
+}]
+
 
 class Service(Enum):
     SFTP = ("SFTP", "sftp", False, False)
@@ -1424,10 +1430,11 @@ def device_menu(args):
     choice = qust.select("What do you want to do?", choices=choices,
                          style=st).ask()
     if "Install" in choice:
-        print("Installing device scripts (need root)")
+        print("Installing device scripts (needs root)")
         device_install_menu(base_dir)
     elif "Link" in choice:
         print("Linking device with service")
+        device_link_menu(base_dir)
 
 
 def device_install_menu(base_dir):
@@ -1437,8 +1444,22 @@ def device_install_menu(base_dir):
     """
     install_script = f"{base_dir}/install-usb-support.sh"
     print(install_script)
-    # execute mosquitto passwd
+    # execute install script
     run([f'sudo {install_script}'], shell=True)
+
+
+def device_link_menu(base_dir):
+    """Link device to a service
+
+    :base_dir: Base directory of configuration files
+    """
+    device = qust.select("What device should be linked?",
+                         choices=USB_DEVICES).ask()
+    # Start systemd service that ensures link
+    link_cmd = f"sudo systemctl start swarm-device@" + \
+        f"{device}\\\\x20openhab.service"
+    run([link_cmd], shell=True)
+    print(f"Linked device {device} to openHAB service")
 
 
 # *** Menu Helper Functions ***
