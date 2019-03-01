@@ -1,0 +1,5 @@
+#!/bin/bash
+docker events --filter 'event=start'| \
+while read line; do
+    /usr/bin/enable-swarm-device $1 $2
+done

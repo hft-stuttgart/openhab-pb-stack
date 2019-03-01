@@ -1,0 +1,10 @@
+[Unit]
+Description=Service to monitor docker containers and mount devices
+
+[Service]
+Type=simple
+Environment="SCRIPT_ARGS=%I"
+ExecStart=/usr/bin/swarm-device-watcher $SCRIPT_ARGS
+
+[Install]
+WantedBy=multi-user.target

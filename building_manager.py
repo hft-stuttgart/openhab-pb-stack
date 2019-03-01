@@ -1119,6 +1119,8 @@ def load_main_entires(base_dir):
                         'value': service_menu})
         entries.append({'name': 'Manage Users',
                         'value': user_menu})
+        entries.append({'name': 'Manage Devices',
+                        'value': device_menu})
         entries.append({'name': 'Execute a command in a service container',
                         'value': exec_menu})
 
@@ -1394,6 +1396,49 @@ def service_modify_menu(base_dir):
 
     if 'Remove' in action:
         delete_service(base_dir, service)
+
+
+# *** Device Menu Functions ***
+def device_menu(args):
+    """Menu to manage devices
+
+    :args: Arguments form commandline
+    """
+    print("Adding device")
+    # Base directory for configs
+    base_dir = args.base_dir
+
+    if base_dir is None:
+        base_dir = os.getcwd()
+
+    # Check if device scripts are installed
+    bin_path = 'usr/bin/enable-swarm-device'
+
+    choices = ['Install device scripts']
+    if not os.path.exists(bin_path):
+        choices.append('Link device to service')
+
+    choices.append('Exit')
+
+    # Ask for action
+    choice = qust.select("What do you want to do?", choices=choices,
+                         style=st).ask()
+    if "Install" in choice:
+        print("Installing device scripts (need root)")
+        device_install_menu(base_dir)
+    elif "Link" in choice:
+        print("Linking device with service")
+
+
+def device_install_menu(base_dir):
+    """Install scripts to link devices
+
+    :base_dir: Base directory of configuration files
+    """
+    install_script = f"{base_dir}/install-usb-support.sh"
+    print(install_script)
+    # execute mosquitto passwd
+    run([f'sudo {install_script}'], shell=True)
 
 
 # *** Menu Helper Functions ***

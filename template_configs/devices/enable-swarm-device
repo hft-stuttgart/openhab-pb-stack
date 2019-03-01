@@ -1,0 +1,18 @@
+#!/bin/bash
+USBDEV=$(readlink -f /dev/$1)
+CONTAINER_NAME=$2
+minor=$(stat -c '%T' $USBDEV)
+major=$(stat -c '%t' $USBDEV)
+if [[ -z $minor || -z $major ]]; then
+    echo "Error setting permissions for container: Device $1 not found"
+    exit
+fi
+dminor=$((0x${minor}))
+dmajor=$((0x${major}))
+CID=$(docker ps --no-trunc -q --filter name=$CONTAINER_NAME | head -1)
+if [[ -z $CID ]]; then
+    echo "Error setting permissions for container: Container $2 not found"
+    exit
+fi
+echo "Setting permissions to access $1 for container $2"
+echo "c $dmajor:$dminor rwm" > /sys/fs/cgroup/devices/docker/$CID/devices.allow
