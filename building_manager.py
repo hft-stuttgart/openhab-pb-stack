@@ -1418,10 +1418,10 @@ def device_menu(args):
         base_dir = os.getcwd()
 
     # Check if device scripts are installed
-    bin_path = 'usr/bin/enable-swarm-device'
+    bin_path = '/usr/bin/enable-swarm-device'
 
     choices = ['Install device scripts']
-    if not os.path.exists(bin_path):
+    if os.path.exists(bin_path):
         choices.append('Link device to service')
 
     choices.append('Exit')
