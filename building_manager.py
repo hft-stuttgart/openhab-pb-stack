@@ -913,6 +913,46 @@ def generate_swarm(machines):
                                      machine, manager=leader)
 
 
+def check_dir_on_machine(dirpath, machine):
+    """Checks weather a dir exists on a machine
+
+    :dirpath: Directory to check
+    :machine: Machine to check
+    :returns: True when dir exists false otherwise
+    """
+    check_command = f"[ -d {dirpath} ]"
+    check_result = run(['docker-machine', 'ssh', machine, check_command])
+    return check_result.returncode == 0
+
+
+def check_file_on_machine(filepath, machine):
+    """Checks weather a file exists on a machine
+
+    :filepath: File to check
+    :machine: Machine to check
+    :returns: True when file exists false otherwise
+    """
+    check_command = f"[ -f {filepath} ]"
+    check_result = run(['docker-machine', 'ssh', machine, check_command])
+    return check_result.returncode == 0
+
+
+def copy_files_to_machine(filepath, machine):
+    """Copyies a directory and its content or a file to a machine
+
+    :filepath: Direcotry or file to copy
+    :machine: Machine to copy to
+    """
+    run(['docker-machine', 'scp', '-r', filepath, f'{machine}:'])
+
+
+def execute_command_on_machine(command, machine):
+    """Executes a command on a docker machine
+
+    :command: Command to execute
+    :machine: Machine to execute command
+    """
+    run([f'docker-machine ssh {machine} {command}'], shell=True)
 # >>>
 
 
@@ -1427,13 +1467,12 @@ def device_menu(args):
     choices.append('Exit')
 
     # Ask for action
-    choice = qust.select("What do you want to do?", choices=choices,
-                         style=st).ask()
+    choice = qust.select("What do you want to do? (root required)",
+                         choices=choices, style=st).ask()
     if "Install" in choice:
         print("Installing device scripts (needs root)")
         device_install_menu(base_dir)
     elif "Link" in choice:
-        print("Linking device with service")
         device_link_menu(base_dir)
 
 
@@ -1442,10 +1481,21 @@ def device_install_menu(base_dir):
 
     :base_dir: Base directory of configuration files
     """
-    install_script = f"{base_dir}/install-usb-support.sh"
-    print(install_script)
-    # execute install script
-    run([f'sudo {install_script}'], shell=True)
+    machine = docker_client_prompt(" to install usb support")
+
+    # Name of base dir on machines
+    external_base_dir = os.path.basename(base_dir)
+
+    # Check if files are available on targeted machine
+    machine_dir = f"{external_base_dir}/install-usb-support.sh"
+    print(machine_dir)
+    if not check_file_on_machine(machine_dir, machine):
+        print("Scripts missing on machine, will be copied")
+        copy_files_to_machine(base_dir, machine)
+    else:
+        print("Scripts available on machine")
+
+    execute_command_on_machine(f'sudo {machine_dir}', machine)
 
 
 def device_link_menu(base_dir):
@@ -1453,12 +1503,13 @@ def device_link_menu(base_dir):
 
     :base_dir: Base directory of configuration files
     """
+    machine = docker_client_prompt(" to link device on")
     device = qust.select("What device should be linked?",
                          choices=USB_DEVICES).ask()
     # Start systemd service that ensures link
     link_cmd = f"sudo systemctl start swarm-device@" + \
         f"{device}\\\\x20openhab.service"
-    run([link_cmd], shell=True)
+    execute_command_on_machine(link_cmd, machine)
     print(f"Linked device {device} to openHAB service")
 
 
