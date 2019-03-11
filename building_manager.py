@@ -1508,14 +1508,11 @@ def device_link_menu(base_dir):
                          choices=USB_DEVICES, style=st).ask()
 
     # Start systemd service that ensures link (escapes of backslash needed)
-    link_cmd_start = f"sudo systemctl status swarm-device@" + \
-        f"{device}\\\\\\\\x20openhab.service"
-    link_cmd_enable = f"sudo systemctl status swarm-device@" + \
+    link_cmd = f"sudo systemctl status swarm-device@" + \
         f"{device}\\\\\\\\x20openhab.service"
 
     # Needs enable to keep after reboot
-    execute_command_on_machine(link_cmd_start, machine)
-    execute_command_on_machine(link_cmd_enable, machine)
+    execute_command_on_machine(link_cmd, machine)
     print(f"Linked device {device} to openHAB service on machine {machine}")
 
 
