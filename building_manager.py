@@ -955,6 +955,26 @@ def execute_command_on_machine(command, machine):
     run([f'docker-machine ssh {machine} {command}'], shell=True)
 # >>>
 
+# ******************************
+# Systemd functions <<<
+# ******************************
+
+
+def list_enabled_devices():
+    """Presents a list of enabled devices (systemd services)
+    :returns: list of enabled devices
+
+    """
+    list_result = run(['systemctl', 'list-units'],
+                      stdout=PIPE, universal_newlines=True)
+    device_list = list_result.stdout.splitlines()
+    # Filter out only swarm-device services
+    device_list = [d.strip() for d in device_list if 'swarm-device' in d]
+    # Extract service name
+    device_list = [d.split()[0] for d in device_list]
+    return device_list
+# >>>
+
 
 # ******************************
 # Docker client commands <<<
@@ -1463,6 +1483,7 @@ def device_menu(args):
     choices = ['Install device scripts']
     if os.path.exists(bin_path):
         choices.append('Link device to service')
+        choices.append('Unlink device')
 
     choices.append('Exit')
 
@@ -1474,6 +1495,8 @@ def device_menu(args):
         device_install_menu(base_dir)
     elif "Link" in choice:
         device_link_menu(base_dir)
+    elif "Unlink" in choice:
+        device_unlink_menu(base_dir)
 
 
 def device_install_menu(base_dir):
@@ -1508,12 +1531,29 @@ def device_link_menu(base_dir):
                          choices=USB_DEVICES, style=st).ask()
 
     # Start systemd service that ensures link (escapes of backslash needed)
-    link_cmd = f"sudo systemctl status swarm-device@" + \
+    link_cmd = f"sudo systemctl enable --now swarm-device@" + \
         f"{device}\\\\\\\\x20openhab.service"
 
     # Needs enable to keep after reboot
     execute_command_on_machine(link_cmd, machine)
     print(f"Linked device {device} to openHAB service on machine {machine}")
+
+
+def device_unlink_menu(base_dir):
+    """Unlink a device from a service
+
+    :base_dir: Base directory of configuration files
+    """
+    machine = docker_client_prompt(" to link device on")
+    device = qust.select("What device should be unlinked?",
+                         choices=USB_DEVICES, style=st).ask()
+
+    # Stop systemd service that ensures link (escapes of backslash needed)
+    link_cmd = f"sudo systemctl disable --now swarm-device@" + \
+        f"{device}\\\\\\\\x20openhab.service"
+
+    execute_command_on_machine(link_cmd, machine)
+    print(f"Unlinked device {device} on machine {machine}")
 
 
 # *** Menu Helper Functions ***
