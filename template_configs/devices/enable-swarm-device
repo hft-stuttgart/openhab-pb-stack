@@ -16,3 +16,5 @@ if [[ -z $CID ]]; then
 fi
 echo "Setting permissions to access $1 for container $2"
 echo "c $dmajor:$dminor rwm" > /sys/fs/cgroup/devices/docker/$CID/devices.allow
+echo "Creating node inside container"
+docker exec $CID mknod /dev/$1 c $dmajor $dminor -m 0666

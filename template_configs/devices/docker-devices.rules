@@ -1,4 +1,4 @@
 # IDs of USB devices may be found with lsusb
  
 # Aeotec Z-Stick Gen5
-SUBSYSTEMS=="usb", ATTRS{idVendor}=="0658", ATTRS{idProduct}=="0200", GROUP="dialout", MODE="0666", SYMLINK+="zwave_stick"
+SUBSYSTEM=="tty", ATTRS{idVendor}=="0658", ATTRS{idProduct}=="0200", GROUP="dialout", MODE="0666", SYMLINK+="zwave_stick"
