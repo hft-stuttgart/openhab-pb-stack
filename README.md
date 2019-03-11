@@ -138,6 +138,12 @@ This will open the script in interactive mode. It shows a menu with various opti
 
 When the script is started for the first time the only option is to create an initial setup. This will ask multiple questions about the setup, e.g. which machine nodes will be used, what services they shall provide and administrative passwords.
 
+
+
+### Manage Devices
+
+An automation setup needs to access several different devices to be able to communicate with sensors and actors (e.g. an USB Z-Wave modem). These are by default not accessible to docker containers, docker swarm also does not provide a default way to grant access to them. Docker uses cgroups to manage device access though. This enables us to grant the correct cgroup permissions when a container launches. The script offers a menu entry to install the necessary files and rules on any connected node. A second entry then allows to setup links between containers and devices. 
+
 ## Config file generation
 
 The openhab-pb stack consists of multiple configuration files that need to be available and will be used by the docker containers. The Manager Script generates these for convinience. In addition they are documented here, sorted by application/folder, to understand their usecases.
