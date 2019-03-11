@@ -1544,7 +1544,7 @@ def device_unlink_menu(base_dir):
 
     :base_dir: Base directory of configuration files
     """
-    machine = docker_client_prompt(" to link device on")
+    machine = docker_client_prompt(" to unlink device from")
     device = qust.select("What device should be unlinked?",
                          choices=USB_DEVICES, style=st).ask()
 
