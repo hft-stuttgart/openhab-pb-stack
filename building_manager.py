@@ -1505,12 +1505,18 @@ def device_link_menu(base_dir):
     """
     machine = docker_client_prompt(" to link device on")
     device = qust.select("What device should be linked?",
-                         choices=USB_DEVICES).ask()
-    # Start systemd service that ensures link
-    link_cmd = f"sudo systemctl start swarm-device@" + \
-        f"{device}\\\\x20openhab.service"
-    execute_command_on_machine(link_cmd, machine)
-    print(f"Linked device {device} to openHAB service")
+                         choices=USB_DEVICES, style=st).ask()
+
+    # Start systemd service that ensures link (escapes of backslash needed)
+    link_cmd_start = f"sudo systemctl status swarm-device@" + \
+        f"{device}\\\\\\\\x20openhab.service"
+    link_cmd_enable = f"sudo systemctl status swarm-device@" + \
+        f"{device}\\\\\\\\x20openhab.service"
+
+    # Needs enable to keep after reboot
+    execute_command_on_machine(link_cmd_start, machine)
+    execute_command_on_machine(link_cmd_enable, machine)
+    print(f"Linked device {device} to openHAB service on machine {machine}")
 
 
 # *** Menu Helper Functions ***
