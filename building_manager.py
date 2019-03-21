@@ -98,6 +98,8 @@ class Service(ServiceBody, Enum):
     POSTGRES = ServiceBody("Postgre SQL", "postgres", True, False)
     MQTT = ServiceBody("Mosquitto MQTT Broker", "mqtt", True, False)
     FILES = ServiceBody("File Manager", "files", False, True, icon='folder')
+    BACKUP = ServiceBody("Volumerize Backups", "backup",
+                         False, False, sftp=True)
 
     @classmethod
     def service_by_prefix(cls, prefix):
@@ -278,7 +280,7 @@ def add_postgres_service(base_dir, hostname, postfix=None):
 
 
 def add_file_service(base_dir, hostname):
-    """Generates an file manager entry and adds it to the compose file
+    """Generates a file manager entry and adds it to the compose file
 
     :base_dir: base directory for configuration files
     :hostname: names of host that the services is added to
@@ -287,7 +289,7 @@ def add_file_service(base_dir, hostname):
     # compose file
     compose_path = base_path + '/' + COMPOSE_NAME
     # service name
-    service_name = f'files_{hostname}'
+    service_name = f'{Service.FILES.prefix}_{hostname}'
     # template
     template = get_service_template(base_dir, Service.FILES.prefix)
     # add command that sets base url
@@ -304,6 +306,32 @@ def add_file_service(base_dir, hostname):
     volume_base = '/srv/'
     template['volumes'] = get_attachable_volume_list(
         base_dir, volume_base, hostname)
+
+    add_or_update_compose_service(compose_path, service_name, template)
+
+
+def add_volumerize_service(base_dir, hostname):
+    """Generates a volumerize backup entry and adds it to the compose file
+
+    :base_dir: base directory for configuration files
+    :hostname: names of host that the services is added to
+    """
+    base_path = base_dir + '/' + CUSTOM_DIR
+    # compose file
+    compose_path = base_path + '/' + COMPOSE_NAME
+    # service name
+    service_name = f'{Service.BACKUP.prefix}_{hostname}'
+    # template
+    template = get_service_template(base_dir, Service.BACKUP.prefix)
+
+    # only label contraint is building
+    template['deploy']['placement']['constraints'][0] = (
+        f"{CONSTRAINTS['building']} == {hostname}")
+
+    # attach volumes
+    volume_base = '/source/'
+    template['volumes'].extend(get_attachable_volume_list(
+        base_dir, volume_base, hostname))
 
     add_or_update_compose_service(compose_path, service_name, template)
 
@@ -417,9 +445,13 @@ def get_attachable_volume_list(base_dir, volume_base, host):
     for host_service in host_services:
         name, instance = get_service_entry_info(host_service)
         volume_service = Service.service_by_prefix(name)
+        # only apply to services that want their volumes attatched
         if volume_service.sftp:
             volumes = get_service_volumes(base_dir, host_service)
-            vlist = [f'{v}:{volume_base}{v}' for v in volumes]
+            # collect volumes not already in list
+            vlist = [
+                f'{v}:{volume_base}{v}' for v in volumes
+                if f'{v}:{volume_base}{v}' not in volume_list]
             volume_list.extend(vlist)
     return volume_list
 
@@ -752,7 +784,8 @@ def generate_id_rsa_files(base_dir):
 
     # execute ssh-keygen
     id_result = run(
-        ['ssh-keygen', '-t', 'rsa', '-b', '4096', '-f', id_path, '-N', ''],
+        ['ssh-keygen', '-m', 'PEM', '-t', 'rsa',
+            '-b', '4096', '-f', id_path, '-N', ''],
         universal_newlines=True, stdout=PIPE)
     return id_result.returncode == 0
 
@@ -837,7 +870,8 @@ def generate_volumerize_file(base_dir, hosts):
     for h in hosts:
         host_config = {
             'description': f'Backup Server on {h}',
-            'url': f'sftp://ohadmin@sftp_{h}://home/ohadmin/backup_data/{h}'
+            'url': f'sftp://ohadmin@sftp_{h}:'
+            f'//home/ohadmin/backup_data/backup/{h}'
         }
         configs.append(host_config)
 
@@ -1410,7 +1444,7 @@ def init_menu(args):
     generate_initial_compose(base_dir)
     # Generate config files based on input
     username = ADMIN_USER
-    generate_sftp_file(base_dir, username, password)
+    generate_sftp_file(base_dir, username, password, ['backup_data/backup'])
     generate_postgres_files(base_dir, username, password)
     generate_mosquitto_file(base_dir, username, password)
     generate_traefik_file(base_dir, username, password)
@@ -1462,6 +1496,8 @@ def init_machine_menu(base_dir, host, increment):
         add_mqtt_service(base_dir, host, increment)
     if Service.POSTGRES in services:
         add_postgres_service(base_dir, host)
+    if Service.BACKUP in services:
+        add_volumerize_service(base_dir, host)
     if Service.FILES in services:
         add_file_service(base_dir, host)
     if Service.SFTP in services:

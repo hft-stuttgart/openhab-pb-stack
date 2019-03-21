@@ -52,11 +52,6 @@ services:
     backup:
         image: blacklabelops/volumerize
         volumes:
-            - "openhab_userdata:/source/openhab_userdata"
-            - "openhab_conf:/source/openhab_conf"
-            - "openhab_addons:/source/openhab_addons"
-            - "nodered_data:/source/nodered_data"
-            - "influxdb_data:/source/influxdb_data"
             - "backup_cache:/volumerize-cache"
             - "backup_data:/backup"
         configs:
@@ -70,7 +65,7 @@ services:
               mode: 0400
         environment:
             - VOLUMERIZE_SOURCE=/source
-            - VOLUMERIZE_TARGET='multi:///backup_config.json?mode=mirror&onfail=abort'
+            - VOLUMERIZE_TARGET=multi:///backup_config.json?mode=mirror&onfail=abort
             - VOLUMERIZE_DUPLICITY_OPTIONS=--ssh-options "-oStrictHostKeyChecking=no"
         networks:
             - habnet
