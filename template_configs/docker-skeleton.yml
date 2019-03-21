@@ -45,13 +45,6 @@ configs:
         file: ./filebrowser/filebrowser.json
 
 volumes:
-    openhab_addons:
-    openhab_conf:
-    openhab_userdata:
-    nodered_data:
-    mosquitto_data:
-    influxdb_data:
-    postgres_data:
     backup_data:
     backup_cache:
 

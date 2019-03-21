@@ -45,13 +45,6 @@ configs:
         file: ./filebrowser/filebrowser.json
 
 volumes:
-    openhab_addons:
-    openhab_conf:
-    openhab_userdata:
-    nodered_data:
-    mosquitto_data:
-    influxdb_data:
-    postgres_data:
     backup_data:
     backup_cache:
 
@@ -88,9 +81,6 @@ services:
     sftp:
         image: "atmoz/sftp"
         volumes:
-            - "openhab_userdata:/home/ohadmin/openhab_userdata"
-            - "openhab_conf:/home/ohadmin/openhab_conf"
-            - "nodered_data:/home/ohadmin/nodered_data"
             - "backup_data:/home/ohadmin/backup_data"
         configs:
             - source: sftp_config
@@ -117,9 +107,9 @@ services:
         volumes:
             - "/etc/localtime:/etc/localtime:ro"
             - "/etc/timezone:/etc/timezone:ro"
-            - "openhab_addons:/openhab/addons"
-            - "openhab_conf:/openhab/conf"
-            - "openhab_userdata:/openhab/userdata"
+            - "addons:/openhab/addons"
+            - "conf:/openhab/conf"
+            - "userdata:/openhab/userdata"
         environment:
             OPENHAB_HTTP_PORT: "8181"
             OPENHAB_HTTPS_PORT: "8443"
@@ -136,7 +126,7 @@ services:
     nodered:
         image: "nodered/node-red-docker"
         volumes:
-            - "nodered_data:/data"
+            - "data:/data"
         networks:
             - habnet
         configs:
@@ -154,7 +144,7 @@ services:
     mqtt:
         image: "eclipse-mosquitto"
         volumes:
-            - "mosquitto_data:/mosquitto/data"
+            - "data:/mosquitto/data"
         ports:
         configs:
             - source: mosquitto_passwords
@@ -170,7 +160,7 @@ services:
     db:
         image: "influxdb"
         volumes:
-            - "influxdb_data:/var/lib/influxdb"
+            - "data:/var/lib/influxdb"
         configs:
             - source: influx_init
               target: /init-influxdb.sh
@@ -193,7 +183,7 @@ services:
     postgres:
         image: "postgres"
         volumes:
-            - "postgres_data:/var/lib/postgresql/data/pgdata"
+            - "data:/var/lib/postgresql/data/pgdata"
         configs:
             - source: postgres_user
               target: /run/secrets/postgres_user
@@ -233,8 +223,6 @@ services:
     files:
         image: filebrowser/filebrowser
         volumes:
-            - openhab_conf:/srv/openHAB
-            - nodered_data:/srv/Node-RED
         configs:
             - source: filebrowser
               target: /.filebrowser.json
@@ -247,14 +235,3 @@ services:
             placement:
                 constraints:
                     - node.labels.building == X
-    zwave_oh:
-        image: docker
-        command: "docker run --rm --name device_oh --network habnet -v /etc/localtime:/etc/localtime:ro -v /etc/timezone:/etc/timezone:ro -v openhab_zwave_conf:/openhab/conf -v openhab_zwave_userdata:/openhab/userdata -p 9898:8080 openhab/openhab:2.4.0"
-        volumes:
-            - "/var/run/docker.sock:/var/run/docker.sock"
-        networks:
-            - habnet
-        deploy:
-            placement:
-                constraints:
-                    - node.labels.device == zwave

@@ -2,6 +2,7 @@
 """ Python module to assist creating and maintaining docker openHab stacks."""
 import crypt
 from enum import Enum
+from typing import NamedTuple
 import logging
 import os
 import sys
@@ -79,20 +80,29 @@ USB_DEVICES = [{
 }]
 
 
-class Service(Enum):
-    SFTP = ("SFTP", "sftp", False, False)
-    OPENHAB = ("OpenHAB", "openhab", True, True, 'dashboard')
-    NODERED = ("Node-RED", "nodered", False, True, 'ballot')
-    POSTGRES = ("Postgre SQL", "postgres", True, False)
-    MQTT = ("Mosquitto MQTT Broker", "mqtt", True, False)
-    FILES = ("File Manager", "files", False, True, 'folder')
+class ServiceBody(NamedTuple):
+    fullname: str
+    prefix: str
+    additional: bool
+    frontend: bool
+    sftp: bool = False
+    icon: str = None
 
-    def __init__(self, fullname, prefix, additional, frontend, icon=None):
-        self.fullname = fullname
-        self.prefix = prefix
-        self.additional = additional
-        self.frontend = frontend
-        self.icon = icon
+
+class Service(ServiceBody, Enum):
+    SFTP = ServiceBody("SFTP", "sftp", False, False)
+    OPENHAB = ServiceBody("OpenHAB", "openhab", True,
+                          True, icon='dashboard', sftp=True)
+    NODERED = ServiceBody("Node-RED", "nodered", False,
+                          True, icon='ballot', sftp=True)
+    POSTGRES = ServiceBody("Postgre SQL", "postgres", True, False)
+    MQTT = ServiceBody("Mosquitto MQTT Broker", "mqtt", True, False)
+    FILES = ServiceBody("File Manager", "files", False, True, icon='folder')
+
+    @classmethod
+    def service_by_prefix(cls, prefix):
+        # cls here is the enumeration
+        return next(service for service in cls if service.prefix == prefix)
 # >>>
 
 
@@ -137,6 +147,11 @@ def add_sftp_service(base_dir, hostname, number=0):
         f"{CONSTRAINTS['building']} == {hostname}")
     template['ports'] = [f'{2222 + number}:22']
 
+    # attach volumes
+    volume_base = '/home/ohadmin/'
+    template['volumes'] = get_attachable_volume_list(
+        base_dir, volume_base, hostname)
+
     add_or_update_compose_service(compose_path, service_name, template)
 
 
@@ -169,6 +184,10 @@ def add_openhab_service(base_dir, hostname):
         f'{service_name}.{{domain:[a-zA-z0-9-]+}}')
     template['deploy']['labels'].append('traefik.sub.frontend.priority=2')
 
+    # replace volumes with named entries in template
+    template['volumes'] = generate_named_volumes(
+        template['volumes'], service_name, compose_path)
+
     add_or_update_compose_service(compose_path, service_name, template)
 
 
@@ -195,6 +214,10 @@ def add_nodered_service(base_dir, hostname):
     template['deploy']['labels'].extend(
         generate_traefik_subdomain_labels(service_name, segment='sub'))
 
+    # replace volumes with named entries in template
+    template['volumes'] = generate_named_volumes(
+        template['volumes'], service_name, compose_path)
+
     add_or_update_compose_service(compose_path, service_name, template)
 
 
@@ -218,6 +241,10 @@ def add_mqtt_service(base_dir, hostname, number=0):
     # ports incremented by number of services
     template['ports'] = [f'{1883 + number}:1883', f'{9001 + number}:9001']
 
+    # replace volumes with named entries in template
+    template['volumes'] = generate_named_volumes(
+        template['volumes'], service_name, compose_path)
+
     add_or_update_compose_service(compose_path, service_name, template)
 
 
@@ -232,14 +259,20 @@ def add_postgres_service(base_dir, hostname, postfix=None):
     # compose file
     compose_path = base_path + '/' + COMPOSE_NAME
     # use hostname as postfix when empty
-    postfix = hostname if postfix is None else postfix
-    # service name
-    service_name = f'postgres_{postfix}'
+    if postfix is None:
+        service_name = f'postgres_{hostname}'
+    else:
+        service_name = f'postgres_{postfix}'
+
     # template
     template = get_service_template(base_dir, Service.POSTGRES.prefix)
     # only label constraint is building
     template['deploy']['placement']['constraints'][0] = (
         f"{CONSTRAINTS['building']} == {hostname}")
+
+    # replace volumes with named entries in template
+    template['volumes'] = generate_named_volumes(
+        template['volumes'], service_name, compose_path)
 
     add_or_update_compose_service(compose_path, service_name, template)
 
@@ -266,6 +299,11 @@ def add_file_service(base_dir, hostname):
     template['deploy']['labels'].extend(
         generate_traefik_path_labels(service_name, segment='main',
                                      redirect=False))
+
+    # attach volumes
+    volume_base = '/srv/'
+    template['volumes'] = get_attachable_volume_list(
+        base_dir, volume_base, hostname)
 
     add_or_update_compose_service(compose_path, service_name, template)
 
@@ -294,7 +332,7 @@ def delete_service(base_dir, service_name):
 
 
 # Functions to extract information
-def get_current_services(base_dir):
+def get_current_services(base_dir, placement=None):
     """Gets a list of currently used services
 
     :base_dir: dir to find files in
@@ -307,11 +345,130 @@ def get_current_services(base_dir):
         # load compose file
         compose = yaml.load(compose_f)
         # generate list of names
-        service_names = [n for n in compose['services']]
+        service_names = []
+        for (name, entry) in compose['services'].items():
+            if placement is None or get_building_of_entry(entry) == placement:
+                service_names.append(name)
+
         return service_names
 
 
+def get_building_of_entry(service_dict):
+    """Extract the configured building constraint from an yaml service entry
+
+    :service_dict: service dict from yaml
+    :returns: building that is set
+    """
+    # get constraints
+    constraint_list = service_dict['deploy']['placement']['constraints']
+    # convert them to dicts
+    label_dict = {i.split("==")[0].strip(): i.split("==")[1].strip()
+                  for i in constraint_list}
+    return label_dict.get('node.labels.building')
+
+
+def get_service_entry_info(service_entry):
+    """Gets service name and instance of a service entry
+
+    :service_entry: service entry name
+    :return: tuple with service_name and instance name
+    """
+    entry_split = service_entry.split("_")
+    name = entry_split[0]
+    instance = entry_split[1]
+    return name, instance
+
+
+def get_service_volumes(base_dir, service_name):
+    """Gets a list of volumes of a service
+
+    :base_dir: dir to find files in
+    :returns: list of volumes
+    """
+    base_path = base_dir + '/' + CUSTOM_DIR
+    # compose file
+    compose_path = base_path + '/' + COMPOSE_NAME
+    with open(compose_path, 'r') as compose_f:
+        # load compose file
+        compose = yaml.load(compose_f)
+        # load service
+        service = compose['services'].get(service_name)
+
+        # extract volume names
+        volume_dict = yaml_list_to_dict(service['volumes'])
+        volumes = list(volume_dict.keys())
+        # filter only named volumes
+        named_volumes = [v for v in volumes if '/' not in v]
+
+        return named_volumes
+
+
 # Helper functions
+def get_attachable_volume_list(base_dir, volume_base, host):
+    """Get a list of volumes from a host that can be attatched for file acccess
+
+    :base_dir: Base config dir
+    :volume_base: Base path of volumes
+    :host: host to consider
+    :returns: list of attachable volume entries
+    """
+    volume_list = []
+    host_services = get_current_services(base_dir, host)
+    for host_service in host_services:
+        name, instance = get_service_entry_info(host_service)
+        volume_service = Service.service_by_prefix(name)
+        if volume_service.sftp:
+            volumes = get_service_volumes(base_dir, host_service)
+            vlist = [f'{v}:{volume_base}{v}' for v in volumes]
+            volume_list.extend(vlist)
+    return volume_list
+
+
+def generate_named_volumes(template_volume_list, service_name, compose_path):
+    """Generates volumes including name of services and ads them to
+    the compose file
+
+    :template_volume_list: List of volume entries from template
+    :service_name: Name of the service instance
+    :compose_path: path to compose file
+    :returns: list of named entries
+
+    """
+    volume_entries = yaml_list_to_dict(template_volume_list)
+    # add name to entries (that are named volumes
+    named_volume_entries = {}
+    for (volume, target) in volume_entries.items():
+        if "/" not in volume:
+            named_volume_entries[f"{service_name}_{volume}"] = target
+        else:
+            named_volume_entries[f"{volume}"] = target
+
+    for (volume, target) in named_volume_entries.items():
+        # declare volume if it is a named one
+        if "/" not in volume:
+            add_volume_entry(compose_path, volume)
+
+    return dict_to_yaml_list(named_volume_entries)
+
+
+def yaml_list_to_dict(yaml_list):
+    """Converts a yaml list (volumes, configs etc) into a python dict
+
+    :yaml_list: list of a yaml containing colon separated entries
+    :return: python dict
+    """
+    return {i.split(":")[0]: i.split(":")[1] for i in yaml_list}
+
+
+def dict_to_yaml_list(pdict):
+    """Converts a python dict into a yaml list (volumes, configs etc)
+
+    :pdict: python dict
+    :return: list of a yaml containing colon separated entries
+    """
+    return [f'{k}:{v}' for (k, v) in pdict.items()]
+
+
 def get_service_template(base_dir, service_name):
     """Gets a service template entry from the template yaml
 
@@ -404,6 +561,25 @@ def add_or_update_compose_service(compose_path, service_name, service_content):
         compose = yaml.load(compose_f)
         # add / update service with template
         compose['services'][service_name] = service_content
+        # write content starting from first line
+        compose_f.seek(0)
+        # write new compose content
+        yaml.dump(compose, compose_f)
+        # reduce file to new size
+        compose_f.truncate()
+
+
+def add_volume_entry(compose_path, volume_name):
+    """Creates an additional volume entry in the stack file
+
+    :compose_path: path of the compose file to change
+    :volume_name: name of the additional volume
+    """
+    with open(compose_path, 'r+') as compose_f:
+        # load compose file
+        compose = yaml.load(compose_f)
+        # add volume
+        compose['volumes'][volume_name] = None
         # write content starting from first line
         compose_f.seek(0)
         # write new compose content
@@ -955,11 +1131,10 @@ def execute_command_on_machine(command, machine):
     run([f'docker-machine ssh {machine} {command}'], shell=True)
 # >>>
 
+
 # ******************************
 # Systemd functions <<<
 # ******************************
-
-
 def list_enabled_devices():
     """Presents a list of enabled devices (systemd services)
     :returns: list of enabled devices
@@ -1279,8 +1454,6 @@ def init_machine_menu(base_dir, host, increment):
     services = qust.checkbox(f'What services shall {host} provide?',
                              choices=generate_cb_service_choices(checked=True),
                              style=st).ask()
-    if Service.SFTP in services:
-        add_sftp_service(base_dir, host, increment)
     if Service.OPENHAB in services:
         add_openhab_service(base_dir, host)
     if Service.NODERED in services:
@@ -1291,6 +1464,8 @@ def init_machine_menu(base_dir, host, increment):
         add_postgres_service(base_dir, host)
     if Service.FILES in services:
         add_file_service(base_dir, host)
+    if Service.SFTP in services:
+        add_sftp_service(base_dir, host, increment)
     return building, services
 
 
