@@ -7,8 +7,6 @@ networks:
         attachable: true
         
 configs:
-    backup_config:
-        file: ./volumerize/backup_config.json
     sftp_config:
         file: ./ssh/sshd_config
     sftp_users:

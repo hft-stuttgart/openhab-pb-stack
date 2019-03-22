@@ -58,7 +58,7 @@ EDIT_FILES = {
     "id_rsa": "ssh/id_rsa",
     "host_key": "ssh/ssh_host_ed25519_key",
     "known_hosts": "ssh/known_hosts",
-    "backup_config": "volumerize/backup_config.json",
+    "backup_config": "volumerize/backup_config",
     "postgres_user": "postgres/user",
     "postgres_passwd": "postgres/passwd",
     "pb_framr_pages": "pb-framr/pages.json",
@@ -332,6 +332,14 @@ def add_volumerize_service(base_dir, hostname):
     volume_base = '/source/'
     template['volumes'].extend(get_attachable_volume_list(
         base_dir, volume_base, hostname))
+
+    # adjust config
+    config_list = template['configs']
+    # get backup entry from configs
+    index, entry = next((i, c) for i, c in enumerate(config_list)
+                        if c['source'] == 'backup_config')
+    entry['source'] = f'backup_config_{hostname}'
+    template['configs'][index] = entry
 
     add_or_update_compose_service(compose_path, service_name, template)
 
@@ -618,6 +626,26 @@ def add_volume_entry(compose_path, volume_name):
         yaml.dump(compose, compose_f)
         # reduce file to new size
         compose_f.truncate()
+
+
+def add_config_entry(compose_path, config_name, config_path):
+    """Creates an additional config entry in the stack file or updates it
+
+    :compose_path: path of the compose file to change
+    :config_name: name of the additional config
+    :config_path: path of the additional config
+    """
+    with open(compose_path, 'r+') as compose_f:
+        # load compose file
+        compose = yaml.load(compose_f)
+        # add config
+        compose['configs'][config_name] = {"file": config_path}
+        # write content starting from first line
+        compose_f.seek(0)
+        # write new compose content
+        yaml.dump(compose, compose_f)
+        # reduce file to new size
+        compose_f.truncate()
 # >>>
 
 
@@ -859,24 +887,30 @@ def generate_traefik_file(base_dir, username, password):
                                   file_content)
 
 
-def generate_volumerize_file(base_dir, hosts):
+def generate_volumerize_files(base_dir, hosts):
     """Generates config for volumerize backups
 
     :base_dir: path that contains custom config folder
     :hosts: names of backup hosts
     """
-    configs = []
-
+    compose_path = base_dir + '/' + CUSTOM_DIR + "/" + COMPOSE_NAME
+    # create one config per host
     for h in hosts:
-        host_config = {
-            'description': f'Backup Server on {h}',
-            'url': f'sftp://ohadmin@sftp_{h}:'
-            f'//home/ohadmin/backup_data/backup/{h}'
-        }
-        configs.append(host_config)
+        configs = []
+        # Each host knows other hosts
+        for t in hosts:
+            host_config = {
+                'description': f'Backup Server on {t}',
+                'url': f'sftp://ohadmin@sftp_{t}:'
+                f'//home/ohadmin/backup_data/backup/{h}'
+            }
+            configs.append(host_config)
 
-    create_or_replace_config_file(
-        base_dir, EDIT_FILES['backup_config'], configs, json=True)
+        config_file = f"{EDIT_FILES['backup_config']}_{h}.json"
+        create_or_replace_config_file(
+            base_dir, config_file, configs, json=True)
+        add_config_entry(
+            compose_path, f'backup_config_{h}', f"./{config_file}")
 
 
 def generate_pb_framr_file(base_dir, frames):
@@ -1448,7 +1482,7 @@ def init_menu(args):
     generate_postgres_files(base_dir, username, password)
     generate_mosquitto_file(base_dir, username, password)
     generate_traefik_file(base_dir, username, password)
-    generate_volumerize_file(base_dir, hosts)
+    generate_volumerize_files(base_dir, hosts)
     generate_filebrowser_file(base_dir, username, password)
     generate_id_rsa_files(base_dir)
     generate_host_key_files(base_dir, hosts)
