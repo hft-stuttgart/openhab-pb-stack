@@ -1223,6 +1223,37 @@ def list_enabled_devices():
 # ******************************
 # Docker client commands <<<
 # ******************************
+def deploy_docker_stack(base_dir, machine):
+    """Deploys the custom stack in the base_dir
+
+    :base_dir: Base directory to look for stack file
+    :machine: Docker machine to execute command
+    """
+    # Set CLI environment to target docker machine
+    machine_env = get_machine_env(machine)
+    os_env = os.environ.copy()
+    os_env.update(machine_env)
+
+    # Get compose file and start stack
+    compose_file = f'{base_dir}/{CUSTOM_DIR}/{COMPOSE_NAME}'
+    deploy_command = f'docker stack deploy -c {compose_file} ohpb'
+    run([f'{deploy_command}'], shell=True, env=os_env)
+
+
+def remove_docker_stack(machine):
+    """Removes the custom stack in the base_dir
+
+    :machine: Docker machine to execute command
+    """
+    # Set CLI environment to target docker machine
+    machine_env = get_machine_env(machine)
+    os_env = os.environ.copy()
+    os_env.update(machine_env)
+
+    remove_command = f'docker stack rm ohpb'
+    run([f'{remove_command}'], shell=True, env=os_env)
+
+
 def resolve_service_nodes(service):
     """Returnes nodes running a specified service
 
@@ -1682,12 +1713,19 @@ def service_menu(args):
 
     # Ask for action
     choice = qust.select("What do you want to do?", choices=[
+        'Re-/Start docker stack', 'Stop docker stack',
         'Modify existing services', 'Add additional service',
         'Exit'], style=st).ask()
     if "Add" in choice:
         service_add_menu(base_dir)
     elif "Modify" in choice:
         service_modify_menu(base_dir)
+    elif "Start" in choice:
+        machine = docker_client_prompt(" to execute deploy")
+        deploy_docker_stack(base_dir, machine)
+    elif "Stop" in choice:
+        machine = docker_client_prompt(" to execute remove")
+        remove_docker_stack(machine)
 
 
 def service_add_menu(base_dir):
@@ -1740,7 +1778,6 @@ def device_menu(args):
 
     :args: Arguments form commandline
     """
-    print("Adding device")
     # Base directory for configs
     base_dir = args.base_dir
 
