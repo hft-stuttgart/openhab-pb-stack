@@ -9,6 +9,7 @@ import sys
 from hashlib import md5
 from shutil import copy2
 from subprocess import PIPE, run
+from time import sleep
 
 import bcrypt
 import docker
@@ -1223,7 +1224,7 @@ def list_enabled_devices():
 # Docker client commands <<<
 # ******************************
 def resolve_service_nodes(service):
-    """Returnes nodes running on a specified service
+    """Returnes nodes running a specified service
 
     :service: name or id of a service
     :returns: list of nodes running the service
@@ -1318,6 +1319,28 @@ def get_docker_client(manager=None):
     else:
         client = docker.from_env()
     return client
+
+
+def restore_building_backup(manager, building):
+    client = get_docker_client(manager)
+    # get backup services of the building
+    services = client.services.list(filters={'label': f'backup={building}'})
+
+    # scale down services (to prevent writes during restore)
+    for s in services:
+        s.scale(0)
+
+    # Give services 10 seconds to shutdown
+    print("Wait for services to shutdown...")
+    sleep(10)
+
+    # execute restore command in backup service
+    run_command_in_service('backup', 'restore', manager)
+
+    # reload and scale up services again
+    for s in services:
+        s.reload()
+        s.scale(1)
 # >>>
 
 
@@ -1430,6 +1453,8 @@ def load_main_entires(base_dir):
                         'value': user_menu})
         entries.append({'name': 'Manage Devices',
                         'value': device_menu})
+        entries.append({'name': 'Manage Backups',
+                        'value': backup_menu})
         entries.append({'name': 'Execute a command in a service container',
                         'value': exec_menu})
 
@@ -1799,6 +1824,66 @@ def device_unlink_menu(base_dir):
 
     execute_command_on_machine(link_cmd, machine)
     print(f"Unlinked device {device} on machine {machine}")
+
+
+# *** Backup Menu Entries ***
+def backup_menu(args):
+    """Menu entry for backup managment
+
+    :args: Passed commandline arguments
+    """
+    # Base directory for configs
+    base_dir = args.base_dir
+
+    if base_dir is None:
+        base_dir = os.getcwd()
+
+    # Ask for action
+    choice = qust.select("What do you want to do?", choices=[
+        'Execute backup', 'Restore backup', 'Exit'],
+        style=st).ask()
+    if "Execute" in choice:
+        execute_backup_menu(base_dir)
+    elif "Restore" in choice:
+        restore_backup_menu(base_dir)
+        print("Restore")
+
+
+def execute_backup_menu(base_dir):
+    """Submenu for backup execution
+
+    :base_dir: Base directory of configuration files
+    """
+    machine = docker_client_prompt(" to backup")
+
+    full = qust.confirm("Execute full backup (otherwise partial)?",
+                        default=False, style=st).ask()
+    if full:
+        run_command_in_service('backup', 'backupFull', machine)
+        print("Full backup completed")
+    else:
+        run_command_in_service('backup', 'backup', machine)
+        print("Partial backup completed")
+
+
+def restore_backup_menu(base_dir):
+    """Submenu for backup execution
+
+    :base_dir: Base directory of configuration files
+    """
+    machine = docker_client_prompt(" to restore")
+
+    confirm = qust.confirm(
+        f'Restore services from last backup on machine {machine} '
+        '(current data will be lost)?',
+        default=False,
+        style=st).ask()
+
+    if confirm:
+        restore_building_backup(machine, machine)
+        print("Restore completed")
+    else:
+        print("Restore canceled")
 
 
 # *** Menu Helper Functions ***
