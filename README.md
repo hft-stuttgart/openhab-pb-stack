@@ -6,9 +6,6 @@ An openHAB public building stack consists of a docker swarm setup that is build 
 
 Heart of the stack is the **Building Manager Script** served as `building_manager.py` and a set of templates. This script provides commands to create and control a multi building setup. 
 
-**Content**
-
-[TOC]
 
 
 ## Getting Started
@@ -24,6 +21,8 @@ This will create a local copy of the script in the current folder. Change to its
 ```sh
 cd openhab-pb-stack
 ```
+
+
 
 #### Requirements
 
@@ -132,6 +131,8 @@ cd openhab-pb-stack		# Change to script directory
 
 This will open the script in interactive mode. It shows a menu with various options to choose from described below.
 
+
+
 ## What can it do?
 
 ### Initial Setup
@@ -139,8 +140,6 @@ This will open the script in interactive mode. It shows a menu with various opti
 When the script is started for the first time the only option is to create an initial setup. This will ask multiple questions about the setup, e.g. which machine nodes will be used, what services they shall provide and what the administrative password should be. It then generates all needed files and places them in the `custom_configs/` folder. 
 
 ![init_menu](docs/images/init_menu.png)
-
-
 
 ### Start and stop the stack
 
@@ -184,11 +183,11 @@ sudo systemctl enable --now swarm-device@zwave_stick\\x20openhab.service
 sudo systemctl disable --now swarm-device@zwave_stick\\x20openhab.service
 ```
 
+
+
 ## How it works
 
 Following parts describe a little more in detail how the script works and how parts may be executed manually.
-
-
 
 ### Configuration file generation
 
