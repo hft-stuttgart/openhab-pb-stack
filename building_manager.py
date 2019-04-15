@@ -35,6 +35,7 @@ st = Style([
     ('instruction', '')               # user instructions for selections
 ])
 
+
 # ******************************
 # Constants <<<
 # ******************************
@@ -110,6 +111,14 @@ class Service(ServiceBody, Enum):
 
 
 # ******************************
+# State Variables <<<
+# ******************************
+base_dir = sys.path[0]
+template_path = f'{base_dir}/{TEMPLATE_DIR}'
+# >>>
+
+
+# ******************************
 # Compose file functions <<<
 # ******************************
 
@@ -119,10 +128,9 @@ def generate_initial_compose(base_dir):
 
     :base_dir: Folder to place configuration files into
     """
-    base_path = base_dir + '/' + CUSTOM_DIR
-    template_path = base_dir + '/' + TEMPLATE_DIR
+    custom_path = base_dir + '/' + CUSTOM_DIR
     # compose file
-    compose = base_path + '/' + COMPOSE_NAME
+    compose = custom_path + '/' + COMPOSE_NAME
     # skeleton file
     skeleton = template_path + '/' + SKELETON_NAME
 
@@ -515,7 +523,6 @@ def get_service_template(base_dir, service_name):
 
     :return: yaml entry of a service
     """
-    template_path = base_dir + '/' + TEMPLATE_DIR
     templates = template_path + '/' + TEMPLATES_NAME
 
     with open(templates, 'r') as templates_file:
@@ -682,10 +689,10 @@ def copy_template_config(base_dir, config_path):
     :config_path: relative path of config to copy from template
     """
     custom_path = base_dir + '/' + CUSTOM_DIR + "/" + config_path
-    template_path = base_dir + '/' + TEMPLATE_DIR + "/" + config_path
+    template_config = f"{template_path}/{config_path}"
 
-    logging.info(f'Copy {config_path} from {custom_path} to {template_path}')
-    copy2(template_path, custom_path)
+    logging.info(f'Copy {config_path} from {template_config} to {custom_path}')
+    copy2(template_config, custom_path)
 
 
 def generate_mosquitto_user_line(username, password):
