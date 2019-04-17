@@ -1336,10 +1336,6 @@ def init_config_dirs_command(args):
 
     :args: parsed commandline arguments
     """
-    if hasattr(args, 'custom_dir'):
-        global custom_path
-        custom_path = args.custom_dir
-
     # generate basic config folder
     generate_config_folders()
 
@@ -1403,11 +1399,6 @@ def interactive_command(args):
 def main_menu(args):
     """ Display main menu
     """
-    # Base directory for configs
-    if hasattr(args, 'custom_dir'):
-        global custom_path
-        custom_path = args.custom_dir
-
     # Main menu prompts selection contains function
     choice = qust.select('Public Building Manager - Main Menu',
                          choices=load_main_entires(), style=st).ask()
@@ -1455,11 +1446,6 @@ def init_menu(args):
 
     :args: Passed commandline arguments
     """
-    # Base directory for configs
-    if hasattr(args, 'custom_dir'):
-        global custom_path
-        custom_path = args.custom_dir
-
     # Prompts
     stack_name = qust.text('Choose a name for your setup', style=st).ask()
     hosts = qust.checkbox('What docker machines will be used?',
@@ -1563,11 +1549,6 @@ def user_menu(args):
 
     :args: Passed commandline arguments
     """
-    # Base directory for configs
-    if hasattr(args, 'custom_dir'):
-        global custom_path
-        custom_path = args.custom_dir
-
     # Ask for action
     choice = qust.select("What do you want to do?", choices=[
         'Add a new user', 'Modify existing user', 'Exit'],
@@ -1647,11 +1628,6 @@ def service_menu(args):
 
     :args: Passed commandline arguments
     """
-    # Base directory for configs
-    if hasattr(args, 'custom_dir'):
-        global custom_path
-        custom_path = args.custom_dir
-
     # Ask for action
     choice = qust.select("What do you want to do?", choices=[
         'Re-/Start docker stack', 'Stop docker stack',
@@ -1715,11 +1691,6 @@ def device_menu(args):
 
     :args: Arguments form commandline
     """
-    # Base directory for configs
-    if hasattr(args, 'custom_dir'):
-        global custom_path
-        custom_path = args.custom_dir
-
     # Check if device scripts are installed
     bin_path = '/usr/bin/enable-swarm-device'
 
@@ -1799,11 +1770,6 @@ def backup_menu(args):
 
     :args: Passed commandline arguments
     """
-    # Base directory for configs
-    if hasattr(args, 'custom_dir'):
-        global custom_path
-        custom_path = args.custom_dir
-
     # Ask for action
     choice = qust.select("What do you want to do?", choices=[
         'Execute backup', 'Restore backup', 'Exit'],
@@ -1947,6 +1913,10 @@ if __name__ == '__main__':
 
     # Parse arguments into args dict
     args = parser.parse_args()
+
+    # Check if custom config dir is used
+    if args.config_dir:
+        custom_path = args.config_dir
 
     # when no subcommand is defined show interactive menu
     try:
