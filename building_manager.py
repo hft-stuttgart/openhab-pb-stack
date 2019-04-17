@@ -115,6 +115,7 @@ class Service(ServiceBody, Enum):
 # ******************************
 base_dir = sys.path[0]
 template_path = f'{base_dir}/{TEMPLATE_DIR}'
+custom_path = f'{base_dir}/{CUSTOM_DIR}'
 # >>>
 
 
@@ -123,12 +124,9 @@ template_path = f'{base_dir}/{TEMPLATE_DIR}'
 # ******************************
 
 # Functions to generate initial file
-def generate_initial_compose(base_dir):
+def generate_initial_compose():
     """Creates the initial compose using the skeleton
-
-    :base_dir: Folder to place configuration files into
     """
-    custom_path = base_dir + '/' + CUSTOM_DIR
     # compose file
     compose = custom_path + '/' + COMPOSE_NAME
     # skeleton file
@@ -139,20 +137,18 @@ def generate_initial_compose(base_dir):
         yaml.dump(init_content, compose_f)
 
 
-def add_sftp_service(base_dir, hostname, number=0):
+def add_sftp_service(hostname, number=0):
     """Generates an sftp entry and adds it to the compose file
 
-    :base_dir: base directory for configuration files
     :hostname: names of host that the services is added to
     :number: increment of exposed port to prevent overlaps
     """
-    base_path = base_dir + '/' + CUSTOM_DIR
     # compose file
-    compose_path = base_path + '/' + COMPOSE_NAME
+    compose_path = f'{custom_path}/{COMPOSE_NAME}'
     # service name
     service_name = f'sftp_{hostname}'
     # template
-    template = get_service_template(base_dir, Service.SFTP.prefix)
+    template = get_service_template(Service.SFTP.prefix)
     # only label contraint is building
     template['deploy']['placement']['constraints'][0] = (
         f"{CONSTRAINTS['building']} == {hostname}")
@@ -160,25 +156,22 @@ def add_sftp_service(base_dir, hostname, number=0):
 
     # attach volumes
     volume_base = '/home/ohadmin/'
-    template['volumes'] = get_attachable_volume_list(
-        base_dir, volume_base, hostname)
+    template['volumes'] = get_attachable_volume_list(volume_base, hostname)
 
     add_or_update_compose_service(compose_path, service_name, template)
 
 
-def add_openhab_service(base_dir, hostname):
+def add_openhab_service(hostname):
     """Generates an openhab entry and adds it to the compose file
 
-    :base_dir: base directory for configuration files
     :hostname: names of host that the services is added to
     """
-    base_path = base_dir + '/' + CUSTOM_DIR
     # compose file
-    compose_path = base_path + '/' + COMPOSE_NAME
+    compose_path = f'{custom_path}/{COMPOSE_NAME}'
     # service name
     service_name = f'openhab_{hostname}'
     # template
-    template = get_service_template(base_dir, Service.OPENHAB.prefix)
+    template = get_service_template(Service.OPENHAB.prefix)
     # only label contraint is building
     template['deploy']['placement']['constraints'][0] = (
         f"{CONSTRAINTS['building']} == {hostname}")
@@ -202,19 +195,17 @@ def add_openhab_service(base_dir, hostname):
     add_or_update_compose_service(compose_path, service_name, template)
 
 
-def add_nodered_service(base_dir, hostname):
+def add_nodered_service(hostname):
     """Generates an nodered entry and adds it to the compose file
 
-    :base_dir: base directory for configuration files
     :hostname: names of host that the services is added to
     """
-    base_path = base_dir + '/' + CUSTOM_DIR
     # compose file
-    compose_path = base_path + '/' + COMPOSE_NAME
+    compose_path = f'{custom_path}/{COMPOSE_NAME}'
     # service name
     service_name = f'nodered_{hostname}'
     # template
-    template = get_service_template(base_dir, Service.NODERED.prefix)
+    template = get_service_template(Service.NODERED.prefix)
     # only label contraint is building
     template['deploy']['placement']['constraints'][0] = (
         f"{CONSTRAINTS['building']} == {hostname}")
@@ -232,20 +223,18 @@ def add_nodered_service(base_dir, hostname):
     add_or_update_compose_service(compose_path, service_name, template)
 
 
-def add_mqtt_service(base_dir, hostname, number=0):
+def add_mqtt_service(hostname, number=0):
     """Generates an mqtt entry and adds it to the compose file
 
-    :base_dir: base directory for configuration files
     :hostname: names of host that the services is added to
     :number: increment of exposed port to prevent overlaps
     """
-    base_path = base_dir + '/' + CUSTOM_DIR
     # compose file
-    compose_path = base_path + '/' + COMPOSE_NAME
+    compose_path = f'{custom_path}/{COMPOSE_NAME}'
     # service name
     service_name = f'mqtt_{hostname}'
     # template
-    template = get_service_template(base_dir, Service.MQTT.prefix)
+    template = get_service_template(Service.MQTT.prefix)
     # only label contraint is building
     template['deploy']['placement']['constraints'][0] = (
         f"{CONSTRAINTS['building']} == {hostname}")
@@ -259,16 +248,14 @@ def add_mqtt_service(base_dir, hostname, number=0):
     add_or_update_compose_service(compose_path, service_name, template)
 
 
-def add_postgres_service(base_dir, hostname, postfix=None):
+def add_postgres_service(hostname, postfix=None):
     """Generates an postgres entry and adds it to the compose file
 
-    :base_dir: base directory for configuration files
     :hostname: names of host that the services is added to
     :postfix: an identifier for this service
     """
-    base_path = base_dir + '/' + CUSTOM_DIR
     # compose file
-    compose_path = base_path + '/' + COMPOSE_NAME
+    compose_path = f'{custom_path}/{COMPOSE_NAME}'
     # use hostname as postfix when empty
     if postfix is None:
         service_name = f'postgres_{hostname}'
@@ -276,7 +263,7 @@ def add_postgres_service(base_dir, hostname, postfix=None):
         service_name = f'postgres_{postfix}'
 
     # template
-    template = get_service_template(base_dir, Service.POSTGRES.prefix)
+    template = get_service_template(Service.POSTGRES.prefix)
     # only label constraint is building
     template['deploy']['placement']['constraints'][0] = (
         f"{CONSTRAINTS['building']} == {hostname}")
@@ -288,19 +275,17 @@ def add_postgres_service(base_dir, hostname, postfix=None):
     add_or_update_compose_service(compose_path, service_name, template)
 
 
-def add_file_service(base_dir, hostname):
+def add_file_service(hostname):
     """Generates a file manager entry and adds it to the compose file
 
-    :base_dir: base directory for configuration files
     :hostname: names of host that the services is added to
     """
-    base_path = base_dir + '/' + CUSTOM_DIR
     # compose file
-    compose_path = base_path + '/' + COMPOSE_NAME
+    compose_path = f'{custom_path}/{COMPOSE_NAME}'
     # service name
     service_name = f'{Service.FILES.prefix}_{hostname}'
     # template
-    template = get_service_template(base_dir, Service.FILES.prefix)
+    template = get_service_template(Service.FILES.prefix)
     # add command that sets base url
     template['command'] = f'-b /{service_name}'
     # only label contraint is building
@@ -313,25 +298,22 @@ def add_file_service(base_dir, hostname):
 
     # attach volumes
     volume_base = '/srv/'
-    template['volumes'] = get_attachable_volume_list(
-        base_dir, volume_base, hostname)
+    template['volumes'] = get_attachable_volume_list(volume_base, hostname)
 
     add_or_update_compose_service(compose_path, service_name, template)
 
 
-def add_volumerize_service(base_dir, hostname):
+def add_volumerize_service(hostname):
     """Generates a volumerize backup entry and adds it to the compose file
 
-    :base_dir: base directory for configuration files
     :hostname: names of host that the services is added to
     """
-    base_path = base_dir + '/' + CUSTOM_DIR
     # compose file
-    compose_path = base_path + '/' + COMPOSE_NAME
+    compose_path = f'{custom_path}/{COMPOSE_NAME}'
     # service name
     service_name = f'{Service.BACKUP.prefix}_{hostname}'
     # template
-    template = get_service_template(base_dir, Service.BACKUP.prefix)
+    template = get_service_template(Service.BACKUP.prefix)
 
     # only label contraint is building
     template['deploy']['placement']['constraints'][0] = (
@@ -339,8 +321,8 @@ def add_volumerize_service(base_dir, hostname):
 
     # attach volumes
     volume_base = '/source/'
-    template['volumes'].extend(get_attachable_volume_list(
-        base_dir, volume_base, hostname))
+    template['volumes'].extend(
+        get_attachable_volume_list(volume_base, hostname))
 
     # adjust config
     config_list = template['configs']
@@ -354,15 +336,13 @@ def add_volumerize_service(base_dir, hostname):
 
 
 # Functions to delete services
-def delete_service(base_dir, service_name):
+def delete_service(service_name):
     """Deletes a service from the compose file
 
-    :base_dir: dir to find files in
     :returns: list of current services
     """
-    base_path = base_dir + '/' + CUSTOM_DIR
     # compose file
-    compose_path = base_path + '/' + COMPOSE_NAME
+    compose_path = f'{custom_path}/{COMPOSE_NAME}'
     with open(compose_path, 'r+') as compose_f:
         # load compose file
         compose = yaml.load(compose_f)
@@ -377,15 +357,13 @@ def delete_service(base_dir, service_name):
 
 
 # Functions to extract information
-def get_current_services(base_dir, placement=None):
+def get_current_services(placement=None):
     """Gets a list of currently used services
 
-    :base_dir: dir to find files in
     :returns: list of current services
     """
-    base_path = base_dir + '/' + CUSTOM_DIR
     # compose file
-    compose_path = base_path + '/' + COMPOSE_NAME
+    compose_path = f'{custom_path}/{COMPOSE_NAME}'
     with open(compose_path, 'r') as compose_f:
         # load compose file
         compose = yaml.load(compose_f)
@@ -424,15 +402,13 @@ def get_service_entry_info(service_entry):
     return name, instance
 
 
-def get_service_volumes(base_dir, service_name):
+def get_service_volumes(service_name):
     """Gets a list of volumes of a service
 
-    :base_dir: dir to find files in
     :returns: list of volumes
     """
-    base_path = base_dir + '/' + CUSTOM_DIR
     # compose file
-    compose_path = base_path + '/' + COMPOSE_NAME
+    compose_path = f'{custom_path}/{COMPOSE_NAME}'
     with open(compose_path, 'r') as compose_f:
         # load compose file
         compose = yaml.load(compose_f)
@@ -449,22 +425,21 @@ def get_service_volumes(base_dir, service_name):
 
 
 # Helper functions
-def get_attachable_volume_list(base_dir, volume_base, host):
+def get_attachable_volume_list(volume_base, host):
     """Get a list of volumes from a host that can be attatched for file acccess
 
-    :base_dir: Base config dir
     :volume_base: Base path of volumes
     :host: host to consider
     :returns: list of attachable volume entries
     """
     volume_list = []
-    host_services = get_current_services(base_dir, host)
+    host_services = get_current_services(host)
     for host_service in host_services:
         name, instance = get_service_entry_info(host_service)
         volume_service = Service.service_by_prefix(name)
         # only apply to services that want their volumes attatched
         if volume_service.sftp:
-            volumes = get_service_volumes(base_dir, host_service)
+            volumes = get_service_volumes(host_service)
             # collect volumes not already in list
             vlist = [
                 f'{v}:{volume_base}{v}' for v in volumes
@@ -518,7 +493,7 @@ def dict_to_yaml_list(pdict):
     return [f'{k}:{v}' for (k, v) in pdict.items()]
 
 
-def get_service_template(base_dir, service_name):
+def get_service_template(service_name):
     """Gets a service template entry from the template yaml
 
     :return: yaml entry of a service
@@ -660,39 +635,36 @@ def add_config_entry(compose_path, config_name, config_path):
 # ******************************
 # Config file functions <<<
 # ******************************
-def generate_config_folders(base_dir):
+def generate_config_folders():
     """Generate folders for configuration files
-
-    :base_dir: Path to add folders to
     """
-    base_path = base_dir + '/' + CUSTOM_DIR
-    if not os.path.exists(base_dir):
-        os.makedirs(base_dir)
+    if not os.path.exists(custom_path):
+        os.makedirs(custom_path)
 
-    print(f'Initialize configuration in {base_path}')
+    print(f'Initialize configuration in {custom_path}')
 
     # generate empty config dirs
     for d in CONFIG_DIRS:
-        new_dir = base_path + '/' + d
+        new_dir = f'{custom_path}/{d}'
         if not os.path.exists(new_dir):
             os.makedirs(new_dir)
 
     # copy template configs
     for template_file in TEMPLATE_FILES:
-        copy_template_config(base_dir, template_file)
+        copy_template_config(template_file)
 
 
-def copy_template_config(base_dir, config_path):
+def copy_template_config(config_path):
     """Copies template configuration files into custom folder
 
-    :base_dir: path that contains template and custom folders
     :config_path: relative path of config to copy from template
     """
-    custom_path = base_dir + '/' + CUSTOM_DIR + "/" + config_path
+    custom_config_path = f'{custom_path}/{config_path}'
     template_config = f"{template_path}/{config_path}"
 
-    logging.info(f'Copy {config_path} from {template_config} to {custom_path}')
-    copy2(template_config, custom_path)
+    logging.info(
+        f'Copy {config_path} from {template_config} to {custom_path}')
+    copy2(template_config, custom_config_path)
 
 
 def generate_mosquitto_user_line(username, password):
@@ -760,15 +732,13 @@ def generate_pb_framr_entry(host, service):
     return entry
 
 
-def generate_mosquitto_file(base_dir, username, password):
+def generate_mosquitto_file(username, password):
     """Generates a mosquitto password file using mosquitto_passwd system tool
 
-    :base_dir: path that contains custom config folder
     :username: username to use
     :password: password that will be used
     """
-    passwd_path = base_dir + '/' + CUSTOM_DIR + "/" + EDIT_FILES[
-        'mosquitto_passwords']
+    passwd_path = f"{custom_path}/{EDIT_FILES['mosquitto_passwords']}"
 
     # ensure file exists
     if not os.path.exists(passwd_path):
@@ -781,42 +751,35 @@ def generate_mosquitto_file(base_dir, username, password):
     return mos_result.returncode == 0
 
 
-def generate_sftp_file(base_dir, username, password, direcories=None):
+def generate_sftp_file(username, password, direcories=None):
     """Generates a sftp password file
 
-    :base_dir: path that contains custom config folder
     :username: username to use
     :password: password that will be used
     :directories: list of directories which the user should have
     """
     # generate line and save it into a file
     file_content = generate_sftp_user_line(username, password, direcories)
-    create_or_replace_config_file(base_dir, EDIT_FILES['sftp_users'],
-                                  file_content)
+    create_or_replace_config_file(EDIT_FILES['sftp_users'], file_content)
 
 
-def generate_postgres_files(base_dir, username, password):
+def generate_postgres_files(username, password):
     """Generates postgres user and password files
 
-    :base_dir: path that contains custom config folder
     :username: username to use
     :password: password that will be used
     """
     # content is purely username and (hashed) password
-    hashed_password = 'md5' + \
-        md5(username.encode() + password.encode()).hexdigest()
-    create_or_replace_config_file(
-        base_dir, EDIT_FILES['postgres_user'], username)
-    create_or_replace_config_file(
-        base_dir, EDIT_FILES['postgres_passwd'], hashed_password)
+    hashed_pass = (
+        f'md5{md5(username.encode() + password.encode()).hexdigest()}')
+    create_or_replace_config_file(EDIT_FILES['postgres_user'], username)
+    create_or_replace_config_file(EDIT_FILES['postgres_passwd'], hashed_pass)
 
 
-def generate_id_rsa_files(base_dir):
+def generate_id_rsa_files():
     """Generates id_rsa and id_rsa.pub private/public keys using ssh-keygen
-
-    :base_dir: path that contains custom config folder
     """
-    id_path = base_dir + '/' + CUSTOM_DIR + "/" + EDIT_FILES['id_rsa']
+    id_path = f"{custom_path}/{EDIT_FILES['id_rsa']}"
 
     # execute ssh-keygen
     id_result = run(
@@ -826,12 +789,10 @@ def generate_id_rsa_files(base_dir):
     return id_result.returncode == 0
 
 
-def generate_host_key_files(base_dir, hosts):
+def generate_host_key_files(hosts):
     """Generates ssh host keys and matching known_hosts using ssh-keygen
-
-    :base_dir: path that contains custom config folder
     """
-    key_path = base_dir + '/' + CUSTOM_DIR + "/" + EDIT_FILES['host_key']
+    key_path = f"{custom_path}/{EDIT_FILES['host_key']}"
     # ssh-keygen generates public key with .pub postfix
     pub_path = key_path + '.pub'
     # host_names with sftp_ postfix
@@ -855,16 +816,14 @@ def generate_host_key_files(base_dir, hosts):
         known_line = ' '.join(sp for sp in split_line)
 
     # write new known_line file
-    create_or_replace_config_file(base_dir, EDIT_FILES['known_hosts'],
-                                  known_line)
+    create_or_replace_config_file(EDIT_FILES['known_hosts'], known_line)
 
     return id_result.returncode == 0
 
 
-def generate_filebrowser_file(base_dir, username, password):
+def generate_filebrowser_file(username, password):
     """Generates a configuration for the filebrowser web app
 
-    :base_dir: path that contains custom config folder
     :username: username to use
     :password: password that will be used
     """
@@ -878,30 +837,27 @@ def generate_filebrowser_file(base_dir, username, password):
         "root": "/srv"
     }
 
-    create_or_replace_config_file(base_dir, EDIT_FILES['filebrowser_conf'],
+    create_or_replace_config_file(EDIT_FILES['filebrowser_conf'],
                                   file_content, json=True)
 
 
-def generate_traefik_file(base_dir, username, password):
+def generate_traefik_file(username, password):
     """Generates a traefik password file
 
-    :base_dir: path that contains custom config folder
     :username: username to use
     :password: password that will be used
     """
     # generate line and save it into a file
     file_content = generate_traefik_user_line(username, password)
-    create_or_replace_config_file(base_dir, EDIT_FILES['traefik_users'],
-                                  file_content)
+    create_or_replace_config_file(EDIT_FILES['traefik_users'], file_content)
 
 
-def generate_volumerize_files(base_dir, hosts):
+def generate_volumerize_files(hosts):
     """Generates config for volumerize backups
 
-    :base_dir: path that contains custom config folder
     :hosts: names of backup hosts
     """
-    compose_path = base_dir + '/' + CUSTOM_DIR + "/" + COMPOSE_NAME
+    compose_path = f'{custom_path}/{COMPOSE_NAME}'
     # create one config per host
     for h in hosts:
         configs = []
@@ -915,16 +871,14 @@ def generate_volumerize_files(base_dir, hosts):
             configs.append(host_config)
 
         config_file = f"{EDIT_FILES['backup_config']}_{h}.json"
-        create_or_replace_config_file(
-            base_dir, config_file, configs, json=True)
+        create_or_replace_config_file(config_file, configs, json=True)
         add_config_entry(
             compose_path, f'backup_config_{h}', f"./{config_file}")
 
 
-def generate_pb_framr_file(base_dir, frames):
+def generate_pb_framr_file(frames):
     """Generates config for pb framr landing page
 
-    :base_dir: path that contains custom config folder
     :frames: a dict that contains hosts with matching name and services
     """
     configs = []
@@ -938,18 +892,17 @@ def generate_pb_framr_file(base_dir, frames):
         configs.append(building)
 
     create_or_replace_config_file(
-        base_dir, EDIT_FILES['pb_framr_pages'], configs, json=True)
+        EDIT_FILES['pb_framr_pages'], configs, json=True)
 
 
-def create_or_replace_config_file(base_dir, config_path, content, json=False):
+def create_or_replace_config_file(config_path, content, json=False):
     """Creates or replaces a config file with new content
 
-    :base_dir: path that contains custom config folder
     :config_path: relative path of config
     :content: content of the file as a string
     """
-    custom_path = base_dir + '/' + CUSTOM_DIR + "/" + config_path
-    with open(custom_path, 'w+') as file:
+    custom_config_path = f'{custom_path}/{config_path}'
+    with open(custom_config_path, 'w+') as file:
         if json:
             import json
             json.dump(content, file, indent=2)
@@ -958,15 +911,14 @@ def create_or_replace_config_file(base_dir, config_path, content, json=False):
 
 
 # Functions to modify existing files
-def add_user_to_traefik_file(base_dir, username, password):
+def add_user_to_traefik_file(username, password):
     """Adds or modifies user in traefik file
 
-    :base_dir: path that contains custom config folder
     :username: username to use
     :password: password that will be used
     """
     # get current users
-    current_users = get_traefik_users(base_dir)
+    current_users = get_traefik_users()
     # ensure to delete old entry if user exists
     users = [u for u in current_users if u['username'] != username]
     # collect existing users lines
@@ -977,18 +929,16 @@ def add_user_to_traefik_file(base_dir, username, password):
     user_lines.append(generate_traefik_user_line(username, password))
     # generate content
     file_content = "\n".join(user_lines)
-    create_or_replace_config_file(base_dir, EDIT_FILES['traefik_users'],
-                                  file_content)
+    create_or_replace_config_file(EDIT_FILES['traefik_users'], file_content)
 
 
-def remove_user_from_traefik_file(base_dir, username):
+def remove_user_from_traefik_file(username):
     """Removes user from traefik file
 
-    :base_dir: path that contains custom config folder
     :username: username to delete
     """
     # get current users
-    current_users = get_traefik_users(base_dir)
+    current_users = get_traefik_users()
     # ensure to delete entry if user exists
     users = [u for u in current_users if u['username'] != username]
     # collect other user lines
@@ -997,35 +947,32 @@ def remove_user_from_traefik_file(base_dir, username):
         user_lines.append(f"{u['username']}:{u['password']}")
     # generate content and write file
     file_content = "\n".join(user_lines)
-    create_or_replace_config_file(base_dir, EDIT_FILES['traefik_users'],
-                                  file_content)
+    create_or_replace_config_file(EDIT_FILES['traefik_users'], file_content)
 
 
 # Functions to get content from files
-def get_users_from_files(base_dir):
+def get_users_from_files():
     """Gets a list of users in files
 
-    :base_dir: dir to find files in
     :returns: list of users
     """
     users = []
 
     # add treafik users
-    users.extend([u['username'] for u in get_traefik_users(base_dir)])
+    users.extend([u['username'] for u in get_traefik_users()])
 
     return users
 
 
-def get_traefik_users(base_dir):
+def get_traefik_users():
     """Gets a list of dicts containing users and password hashes
 
-    :base_dir: dir to find files in
     :returns: list of users / password dicts
     """
     users = []
 
     # get treafik users
-    traefik_file = f"{base_dir}/{CUSTOM_DIR}/{EDIT_FILES['traefik_users']}"
+    traefik_file = f"{custom_path}/{EDIT_FILES['traefik_users']}"
     with open(traefik_file, 'r') as file:
         lines = file.read().splitlines()
         for line in lines:
@@ -1230,10 +1177,9 @@ def list_enabled_devices():
 # ******************************
 # Docker client commands <<<
 # ******************************
-def deploy_docker_stack(base_dir, machine):
-    """Deploys the custom stack in the base_dir
+def deploy_docker_stack(machine):
+    """Deploys the custom stack in the custom_path
 
-    :base_dir: Base directory to look for stack file
     :machine: Docker machine to execute command
     """
     # Set CLI environment to target docker machine
@@ -1242,13 +1188,13 @@ def deploy_docker_stack(base_dir, machine):
     os_env.update(machine_env)
 
     # Get compose file and start stack
-    compose_file = f'{base_dir}/{CUSTOM_DIR}/{COMPOSE_NAME}'
+    compose_file = f'{custom_path}/{COMPOSE_NAME}'
     deploy_command = f'docker stack deploy -c {compose_file} ohpb'
     run([f'{deploy_command}'], shell=True, env=os_env)
 
 
 def remove_docker_stack(machine):
-    """Removes the custom stack in the base_dir
+    """Removes the custom stack in the custom_path
 
     :machine: Docker machine to execute command
     """
@@ -1390,13 +1336,12 @@ def init_config_dirs_command(args):
 
     :args: parsed commandline arguments
     """
-    base_dir = args.base_dir
-
-    if base_dir is None:
-        base_dir = os.getcwd()
+    if hasattr(args, 'custom_dir'):
+        global custom_path
+        custom_path = args.custom_dir
 
     # generate basic config folder
-    generate_config_folders(base_dir)
+    generate_config_folders()
 
 
 def assign_building_command(args):
@@ -1459,26 +1404,23 @@ def main_menu(args):
     """ Display main menu
     """
     # Base directory for configs
-    base_dir = args.base_dir
-
-    if base_dir is None:
-        base_dir = os.getcwd()
+    if hasattr(args, 'custom_dir'):
+        global custom_path
+        custom_path = args.custom_dir
 
     # Main menu prompts selection contains function
     choice = qust.select('Public Building Manager - Main Menu',
-                         choices=load_main_entires(base_dir), style=st).ask()
+                         choices=load_main_entires(), style=st).ask()
 
     # Call funtion of menu entry
     choice(args)
 
 
-def load_main_entires(base_dir):
+def load_main_entires():
     """Loads entries for main menu depending on available files
 
-    :base_dir: directory of configuration files
     :returns: entries of main menu
     """
-    custom_path = base_dir + '/' + CUSTOM_DIR
 
     entries = []
     if not os.path.exists(custom_path):
@@ -1514,10 +1456,9 @@ def init_menu(args):
     :args: Passed commandline arguments
     """
     # Base directory for configs
-    base_dir = args.base_dir
-
-    if base_dir is None:
-        base_dir = os.getcwd()
+    if hasattr(args, 'custom_dir'):
+        global custom_path
+        custom_path = args.custom_dir
 
     # Prompts
     stack_name = qust.text('Choose a name for your setup', style=st).ask()
@@ -1537,31 +1478,31 @@ def init_menu(args):
             print("Passwords did not match, try again")
 
     # Initialize custom configuration dirs and templates
-    generate_config_folders(base_dir)
-    generate_initial_compose(base_dir)
+    generate_config_folders()
+    generate_initial_compose()
     # Generate config files based on input
     username = ADMIN_USER
-    generate_sftp_file(base_dir, username, password, ['backup_data/backup'])
-    generate_postgres_files(base_dir, username, password)
-    generate_mosquitto_file(base_dir, username, password)
-    generate_traefik_file(base_dir, username, password)
-    generate_volumerize_files(base_dir, hosts)
-    generate_filebrowser_file(base_dir, username, password)
-    generate_id_rsa_files(base_dir)
-    generate_host_key_files(base_dir, hosts)
+    generate_sftp_file(username, password, ['backup_data/backup'])
+    generate_postgres_files(username, password)
+    generate_mosquitto_file(username, password)
+    generate_traefik_file(username, password)
+    generate_volumerize_files(hosts)
+    generate_filebrowser_file(username, password)
+    generate_id_rsa_files()
+    generate_host_key_files(hosts)
 
     frames = []
     for i, host in enumerate(hosts):
-        building, services = init_machine_menu(base_dir, host, i)
+        building, services = init_machine_menu(host, i)
         frames.append({'host': host,
                        'building': building, 'services': services})
 
     # When frames is not empty generate frame config
     if frames:
-        generate_pb_framr_file(base_dir, frames)
+        generate_pb_framr_file(frames)
 
     # print(answers)
-    print(f"Configuration files for {stack_name} generated in {base_dir}")
+    print(f"Configuration files for {stack_name} generated in {custom_path}")
 
     # Check if changes shall be applied to docker environment
     generate = qust.confirm(
@@ -1571,10 +1512,9 @@ def init_menu(args):
         generate_swarm(hosts)
 
 
-def init_machine_menu(base_dir, host, increment):
+def init_machine_menu(host, increment):
     """Prompts to select server services
 
-    :base_dir: Directory of config files
     :host: docker-machine host
     :increment: incrementing number to ensure ports are unique
     :return: choosen building name and services
@@ -1586,19 +1526,19 @@ def init_machine_menu(base_dir, host, increment):
                              choices=generate_cb_service_choices(checked=True),
                              style=st).ask()
     if Service.OPENHAB in services:
-        add_openhab_service(base_dir, host)
+        add_openhab_service(host)
     if Service.NODERED in services:
-        add_nodered_service(base_dir, host)
+        add_nodered_service(host)
     if Service.MQTT in services:
-        add_mqtt_service(base_dir, host, increment)
+        add_mqtt_service(host, increment)
     if Service.POSTGRES in services:
-        add_postgres_service(base_dir, host)
+        add_postgres_service(host)
     if Service.BACKUP in services:
-        add_volumerize_service(base_dir, host)
+        add_volumerize_service(host)
     if Service.FILES in services:
-        add_file_service(base_dir, host)
+        add_file_service(host)
     if Service.SFTP in services:
-        add_sftp_service(base_dir, host, increment)
+        add_sftp_service(host, increment)
     return building, services
 
 
@@ -1624,27 +1564,24 @@ def user_menu(args):
     :args: Passed commandline arguments
     """
     # Base directory for configs
-    base_dir = args.base_dir
-
-    if base_dir is None:
-        base_dir = os.getcwd()
+    if hasattr(args, 'custom_dir'):
+        global custom_path
+        custom_path = args.custom_dir
 
     # Ask for action
     choice = qust.select("What do you want to do?", choices=[
         'Add a new user', 'Modify existing user', 'Exit'],
         style=st).ask()
     if "Add" in choice:
-        new_user_menu(base_dir)
+        new_user_menu()
     elif "Modify" in choice:
-        modify_user_menu(base_dir)
+        modify_user_menu()
 
 
-def new_user_menu(base_dir):
+def new_user_menu():
     """Menu entry for new users
-
-    :base_dir: Directory of config files
     """
-    current_users = get_users_from_files(base_dir)
+    current_users = get_users_from_files()
     new_user = False
     while not new_user:
         username = qust.text("Choose a new username:", style=st).ask()
@@ -1665,15 +1602,13 @@ def new_user_menu(base_dir):
         else:
             print("Passwords did not match, try again")
 
-    add_user_to_traefik_file(base_dir, username, password)
+    add_user_to_traefik_file(username, password)
 
 
-def modify_user_menu(base_dir):
+def modify_user_menu():
     """Menu entry to remove users or change passwords
-
-    :base_dir: Directory of config files
     """
-    current_users = get_users_from_files(base_dir)
+    current_users = get_users_from_files()
     user = qust.select("Choose user to modify:",
                        choices=current_users, style=st).ask()
 
@@ -1691,7 +1626,7 @@ def modify_user_menu(base_dir):
         is_sure = qust.confirm(
             f"Are you sure you want to delete user {user}?", style=st).ask()
         if is_sure:
-            remove_user_from_traefik_file(base_dir, user)
+            remove_user_from_traefik_file(user)
     elif 'Change' in action:
         password_match = False
         while not password_match:
@@ -1703,7 +1638,7 @@ def modify_user_menu(base_dir):
                 password_match = True
             else:
                 print("Passwords did not match, try again")
-        add_user_to_traefik_file(base_dir, user, password)
+        add_user_to_traefik_file(user, password)
 
 
 # *** Service Menu Entries ***
@@ -1713,10 +1648,9 @@ def service_menu(args):
     :args: Passed commandline arguments
     """
     # Base directory for configs
-    base_dir = args.base_dir
-
-    if base_dir is None:
-        base_dir = os.getcwd()
+    if hasattr(args, 'custom_dir'):
+        global custom_path
+        custom_path = args.custom_dir
 
     # Ask for action
     choice = qust.select("What do you want to do?", choices=[
@@ -1724,21 +1658,19 @@ def service_menu(args):
         'Modify existing services', 'Add additional service',
         'Exit'], style=st).ask()
     if "Add" in choice:
-        service_add_menu(base_dir)
+        service_add_menu()
     elif "Modify" in choice:
-        service_modify_menu(base_dir)
+        service_modify_menu()
     elif "Start" in choice:
         machine = docker_client_prompt(" to execute deploy")
-        deploy_docker_stack(base_dir, machine)
+        deploy_docker_stack(machine)
     elif "Stop" in choice:
         machine = docker_client_prompt(" to execute remove")
         remove_docker_stack(machine)
 
 
-def service_add_menu(base_dir):
+def service_add_menu():
     """Menu to add additional services
-
-    :base_dir: Directory of config files
     """
     services = [s for s in Service if s.additional]
     service = qust.select(
@@ -1753,15 +1685,13 @@ def service_add_menu(base_dir):
 
     if service and host and identifier:
         if service == Service.POSTGRES:
-            add_postgres_service(base_dir, host, postfix=identifier)
+            add_postgres_service(host, postfix=identifier)
 
 
-def service_modify_menu(base_dir):
+def service_modify_menu():
     """Menu to modify services
-
-    :base_dir: Directory of config files
     """
-    services = get_current_services(base_dir)
+    services = get_current_services()
     service = qust.select(
         'What service do you want to modify?', choices=services).ask()
 
@@ -1776,7 +1706,7 @@ def service_modify_menu(base_dir):
         f"What should we do with {service}?", choices=choices, style=st).ask()
 
     if 'Remove' in action:
-        delete_service(base_dir, service)
+        delete_service(service)
 
 
 # *** Device Menu Functions ***
@@ -1786,10 +1716,9 @@ def device_menu(args):
     :args: Arguments form commandline
     """
     # Base directory for configs
-    base_dir = args.base_dir
-
-    if base_dir is None:
-        base_dir = os.getcwd()
+    if hasattr(args, 'custom_dir'):
+        global custom_path
+        custom_path = args.custom_dir
 
     # Check if device scripts are installed
     bin_path = '/usr/bin/enable-swarm-device'
@@ -1806,17 +1735,15 @@ def device_menu(args):
                          choices=choices, style=st).ask()
     if "Install" in choice:
         print("Installing device scripts (needs root)")
-        device_install_menu(base_dir)
+        device_install_menu()
     elif "Link" in choice:
-        device_link_menu(base_dir)
+        device_link_menu()
     elif "Unlink" in choice:
-        device_unlink_menu(base_dir)
+        device_unlink_menu()
 
 
-def device_install_menu(base_dir):
+def device_install_menu():
     """Install scripts to link devices
-
-    :base_dir: Base directory of configuration files
     """
     machine = docker_client_prompt(" to install usb support")
 
@@ -1835,10 +1762,8 @@ def device_install_menu(base_dir):
     execute_command_on_machine(f'sudo {machine_dir}', machine)
 
 
-def device_link_menu(base_dir):
+def device_link_menu():
     """Link device to a service
-
-    :base_dir: Base directory of configuration files
     """
     machine = docker_client_prompt(" to link device on")
     device = qust.select("What device should be linked?",
@@ -1853,10 +1778,8 @@ def device_link_menu(base_dir):
     print(f"Linked device {device} to openHAB service on machine {machine}")
 
 
-def device_unlink_menu(base_dir):
+def device_unlink_menu():
     """Unlink a device from a service
-
-    :base_dir: Base directory of configuration files
     """
     machine = docker_client_prompt(" to unlink device from")
     device = qust.select("What device should be unlinked?",
@@ -1877,26 +1800,23 @@ def backup_menu(args):
     :args: Passed commandline arguments
     """
     # Base directory for configs
-    base_dir = args.base_dir
-
-    if base_dir is None:
-        base_dir = os.getcwd()
+    if hasattr(args, 'custom_dir'):
+        global custom_path
+        custom_path = args.custom_dir
 
     # Ask for action
     choice = qust.select("What do you want to do?", choices=[
         'Execute backup', 'Restore backup', 'Exit'],
         style=st).ask()
     if "Execute" in choice:
-        execute_backup_menu(base_dir)
+        execute_backup_menu()
     elif "Restore" in choice:
-        restore_backup_menu(base_dir)
+        restore_backup_menu()
         print("Restore")
 
 
-def execute_backup_menu(base_dir):
+def execute_backup_menu():
     """Submenu for backup execution
-
-    :base_dir: Base directory of configuration files
     """
     machine = docker_client_prompt(" to backup")
 
@@ -1910,10 +1830,8 @@ def execute_backup_menu(base_dir):
         print("Partial backup completed")
 
 
-def restore_backup_menu(base_dir):
+def restore_backup_menu():
     """Submenu for backup execution
-
-    :base_dir: Base directory of configuration files
     """
     machine = docker_client_prompt(" to restore")
 
@@ -1976,7 +1894,7 @@ if __name__ == '__main__':
         description='Generate and manage multi'
         'building configurations of openHAB with docker swarm')
     parser.add_argument(
-        '--base_dir',
+        '--config_dir',
         '-d',
         help='Directory to creat config folders in, default is current dir')
     subparsers = parser.add_subparsers()
