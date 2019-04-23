@@ -137,51 +137,52 @@ def generate_initial_compose():
         yaml.dump(init_content, compose_f)
 
 
-def add_sftp_service(hostname, number=0):
+def add_sftp_service(building, number=0):
     """Generates an sftp entry and adds it to the compose file
 
-    :hostname: names of host that the services is added to
+    :building: names of building that the services is added to
     :number: increment of exposed port to prevent overlaps
     """
     # compose file
     compose_path = f'{custom_path}/{COMPOSE_NAME}'
     # service name
-    service_name = f'sftp_{hostname}'
+    service_name = f'sftp_{building}'
     # template
     template = get_service_template(Service.SFTP.prefix)
     # only label contraint is building
     template['deploy']['placement']['constraints'][0] = (
-        f"{CONSTRAINTS['building']} == {hostname}")
+        f"{CONSTRAINTS['building']} == {building}")
     template['ports'] = [f'{2222 + number}:22']
 
     # attach volumes
     volume_base = '/home/ohadmin/'
-    template['volumes'] = get_attachable_volume_list(volume_base, hostname)
+    template['volumes'] = get_attachable_volume_list(volume_base, building)
 
     add_or_update_compose_service(compose_path, service_name, template)
 
 
-def add_openhab_service(hostname):
+def add_openhab_service(building, host):
     """Generates an openhab entry and adds it to the compose file
 
-    :hostname: names of host that the services is added to
+    :building: name of building that the services is added to
+    :host: host the building is added to, used for routing
     """
     # compose file
     compose_path = f'{custom_path}/{COMPOSE_NAME}'
     # service name
-    service_name = f'openhab_{hostname}'
+    service_name = f'openhab_{building}'
     # template
     template = get_service_template(Service.OPENHAB.prefix)
     # only label contraint is building
     template['deploy']['placement']['constraints'][0] = (
-        f"{CONSTRAINTS['building']} == {hostname}")
+        f"{CONSTRAINTS['building']} == {building}")
     # include in backups of this building
-    template['deploy']['labels'].append(f'backup={hostname}')
+    template['deploy']['labels'].append(f'backup={building}')
     # traefik backend
     template['deploy']['labels'].append(f'traefik.backend={service_name}')
     # traefik frontend domain->openhab
     template['deploy']['labels'].extend(
-        generate_traefik_host_labels(hostname, segment='main'))
+        generate_traefik_host_labels(host, segment='main'))
     # traefik frontend subdomain openhab_hostname.* -> openhab
     template['deploy']['labels'].append(
         f'traefik.sub.frontend.rule=HostRegexp:'
@@ -195,22 +196,22 @@ def add_openhab_service(hostname):
     add_or_update_compose_service(compose_path, service_name, template)
 
 
-def add_nodered_service(hostname):
+def add_nodered_service(building):
     """Generates an nodered entry and adds it to the compose file
 
-    :hostname: names of host that the services is added to
+    :building: name of building that the services is added to
     """
     # compose file
     compose_path = f'{custom_path}/{COMPOSE_NAME}'
     # service name
-    service_name = f'nodered_{hostname}'
+    service_name = f'nodered_{building}'
     # template
     template = get_service_template(Service.NODERED.prefix)
     # only label contraint is building
     template['deploy']['placement']['constraints'][0] = (
-        f"{CONSTRAINTS['building']} == {hostname}")
+        f"{CONSTRAINTS['building']} == {building}")
     template['deploy']['labels'].append(f'traefik.backend={service_name}')
-    template['deploy']['labels'].append(f'backup={hostname}')
+    template['deploy']['labels'].append(f'backup={building}')
     template['deploy']['labels'].extend(
         generate_traefik_path_labels(service_name, segment='main'))
     template['deploy']['labels'].extend(
@@ -223,21 +224,21 @@ def add_nodered_service(hostname):
     add_or_update_compose_service(compose_path, service_name, template)
 
 
-def add_mqtt_service(hostname, number=0):
+def add_mqtt_service(building, number=0):
     """Generates an mqtt entry and adds it to the compose file
 
-    :hostname: names of host that the services is added to
+    :building: name of building that the services is added to
     :number: increment of exposed port to prevent overlaps
     """
     # compose file
     compose_path = f'{custom_path}/{COMPOSE_NAME}'
     # service name
-    service_name = f'mqtt_{hostname}'
+    service_name = f'mqtt_{building}'
     # template
     template = get_service_template(Service.MQTT.prefix)
     # only label contraint is building
     template['deploy']['placement']['constraints'][0] = (
-        f"{CONSTRAINTS['building']} == {hostname}")
+        f"{CONSTRAINTS['building']} == {building}")
     # ports incremented by number of services
     template['ports'] = [f'{1883 + number}:1883', f'{9001 + number}:9001']
 
@@ -248,17 +249,17 @@ def add_mqtt_service(hostname, number=0):
     add_or_update_compose_service(compose_path, service_name, template)
 
 
-def add_postgres_service(hostname, postfix=None):
+def add_postgres_service(building, postfix=None):
     """Generates an postgres entry and adds it to the compose file
 
-    :hostname: names of host that the services is added to
+    :building: name of building that the services is added to
     :postfix: an identifier for this service
     """
     # compose file
     compose_path = f'{custom_path}/{COMPOSE_NAME}'
-    # use hostname as postfix when empty
+    # use building as postfix when empty
     if postfix is None:
-        service_name = f'postgres_{hostname}'
+        service_name = f'postgres_{building}'
     else:
         service_name = f'postgres_{postfix}'
 
@@ -266,7 +267,7 @@ def add_postgres_service(hostname, postfix=None):
     template = get_service_template(Service.POSTGRES.prefix)
     # only label constraint is building
     template['deploy']['placement']['constraints'][0] = (
-        f"{CONSTRAINTS['building']} == {hostname}")
+        f"{CONSTRAINTS['building']} == {building}")
 
     # replace volumes with named entries in template
     template['volumes'] = generate_named_volumes(
@@ -275,22 +276,22 @@ def add_postgres_service(hostname, postfix=None):
     add_or_update_compose_service(compose_path, service_name, template)
 
 
-def add_file_service(hostname):
+def add_file_service(building):
     """Generates a file manager entry and adds it to the compose file
 
-    :hostname: names of host that the services is added to
+    :building: names of host that the services is added to
     """
     # compose file
     compose_path = f'{custom_path}/{COMPOSE_NAME}'
     # service name
-    service_name = f'{Service.FILES.prefix}_{hostname}'
+    service_name = f'{Service.FILES.prefix}_{building}'
     # template
     template = get_service_template(Service.FILES.prefix)
     # add command that sets base url
     template['command'] = f'-b /{service_name}'
     # only label contraint is building
     template['deploy']['placement']['constraints'][0] = (
-        f"{CONSTRAINTS['building']} == {hostname}")
+        f"{CONSTRAINTS['building']} == {building}")
     template['deploy']['labels'].append(f'traefik.backend={service_name}')
     template['deploy']['labels'].extend(
         generate_traefik_path_labels(service_name, segment='main',
@@ -298,38 +299,38 @@ def add_file_service(hostname):
 
     # attach volumes
     volume_base = '/srv/'
-    template['volumes'] = get_attachable_volume_list(volume_base, hostname)
+    template['volumes'] = get_attachable_volume_list(volume_base, building)
 
     add_or_update_compose_service(compose_path, service_name, template)
 
 
-def add_volumerize_service(hostname):
+def add_volumerize_service(building):
     """Generates a volumerize backup entry and adds it to the compose file
 
-    :hostname: names of host that the services is added to
+    :building: names of host that the services is added to
     """
     # compose file
     compose_path = f'{custom_path}/{COMPOSE_NAME}'
     # service name
-    service_name = f'{Service.BACKUP.prefix}_{hostname}'
+    service_name = f'{Service.BACKUP.prefix}_{building}'
     # template
     template = get_service_template(Service.BACKUP.prefix)
 
     # only label contraint is building
     template['deploy']['placement']['constraints'][0] = (
-        f"{CONSTRAINTS['building']} == {hostname}")
+        f"{CONSTRAINTS['building']} == {building}")
 
     # attach volumes
     volume_base = '/source/'
     template['volumes'].extend(
-        get_attachable_volume_list(volume_base, hostname))
+        get_attachable_volume_list(volume_base, building))
 
     # adjust config
     config_list = template['configs']
     # get backup entry from configs
     index, entry = next((i, c) for i, c in enumerate(config_list)
                         if c['source'] == 'backup_config')
-    entry['source'] = f'backup_config_{hostname}'
+    entry['source'] = f'backup_config_{building}'
     template['configs'][index] = entry
 
     add_or_update_compose_service(compose_path, service_name, template)
@@ -358,8 +359,9 @@ def delete_service(service_name):
 
 # Functions to extract information
 def get_current_services(placement=None):
-    """Gets a list of currently used services
+    """Gets a list of currently used services may be restricted to a placement
 
+    :placement: placement contraint the service shall match
     :returns: list of current services
     """
     # compose file
@@ -374,6 +376,26 @@ def get_current_services(placement=None):
                 service_names.append(name)
 
         return service_names
+
+
+def get_current_building_constraints():
+    """Gets a list of currently used building constraints
+
+    :returns: set of current buildings
+    """
+    # compose file
+    compose_path = f'{custom_path}/{COMPOSE_NAME}'
+    with open(compose_path, 'r') as compose_f:
+        # load compose file
+        compose = yaml.load(compose_f)
+        # generate list of buildings
+        building_names = set()
+        for (name, entry) in compose['services'].items():
+            building = get_building_of_entry(entry)
+            if building:
+                building_names.add(building)
+
+        return building_names
 
 
 def get_building_of_entry(service_dict):
@@ -425,15 +447,15 @@ def get_service_volumes(service_name):
 
 
 # Helper functions
-def get_attachable_volume_list(volume_base, host):
-    """Get a list of volumes from a host that can be attatched for file acccess
+def get_attachable_volume_list(volume_base, building):
+    """Get a list of volumes from a building that can be attatched for file acccess
 
     :volume_base: Base path of volumes
-    :host: host to consider
+    :building: building to consider
     :returns: list of attachable volume entries
     """
     volume_list = []
-    host_services = get_current_services(host)
+    host_services = get_current_services(building)
     for host_service in host_services:
         name, instance = get_service_entry_info(host_service)
         volume_service = Service.service_by_prefix(name)
@@ -713,9 +735,10 @@ def generate_traefik_user_line(username, password):
     return line
 
 
-def generate_pb_framr_entry(host, service):
+def generate_pb_framr_entry(building, host, service):
     """Generates a single entry of the framr file
 
+    :building: building this entry is intended for
     :host: host this entry is intended for
     :service: entry from service enum
     :returns: a dict fitting the asked entry
@@ -727,7 +750,7 @@ def generate_pb_framr_entry(host, service):
         entry['url'] = f'http://{host}/'
         pass
     else:
-        entry['url'] = f'/{service.prefix}_{host}/'
+        entry['url'] = f'/{service.prefix}_{building}/'
     entry['icon'] = service.icon
     return entry
 
@@ -852,28 +875,30 @@ def generate_traefik_file(username, password):
     create_or_replace_config_file(EDIT_FILES['traefik_users'], file_content)
 
 
-def generate_volumerize_files(hosts):
+def generate_volumerize_files(host_entries):
     """Generates config for volumerize backups
 
-    :hosts: names of backup hosts
+    :host_entries: dickt of host entries
     """
     compose_path = f'{custom_path}/{COMPOSE_NAME}'
     # create one config per host
-    for h in hosts:
+    for h in host_entries:
         configs = []
         # Each host knows other hosts
-        for t in hosts:
+        for t in host_entries:
             host_config = {
-                'description': f'Backup Server on {t}',
-                'url': f'sftp://ohadmin@sftp_{t}:'
-                f'//home/ohadmin/backup_data/backup/{h}'
+                'description': f"'Backup Server on {t['building_name']}",
+                'url': f"sftp://ohadmin@sftp_{t['building_id']}:"
+                f"//home/ohadmin/backup_data/backup/{h['building_id']}"
             }
             configs.append(host_config)
 
-        config_file = f"{EDIT_FILES['backup_config']}_{h}.json"
+        config_file = f"{EDIT_FILES['backup_config']}_{h['building_id']}.json"
         create_or_replace_config_file(config_file, configs, json=True)
         add_config_entry(
-            compose_path, f'backup_config_{h}', f"./{config_file}")
+            compose_path,
+            f"backup_config_{h['building_id']}",
+            f"./{config_file}")
 
 
 def generate_pb_framr_file(frames):
@@ -885,8 +910,8 @@ def generate_pb_framr_file(frames):
 
     for f in frames:
         building = {
-            'instance': f['building'],
-            'entries': [generate_pb_framr_entry(f['host'], s)
+            'instance': f['building_name'],
+            'entries': [generate_pb_framr_entry(f['building_id'], f['host'], s)
                         for s in f['services'] if s.frontend]
         }
         configs.append(building)
@@ -1472,20 +1497,23 @@ def init_menu(args):
     generate_postgres_files(username, password)
     generate_mosquitto_file(username, password)
     generate_traefik_file(username, password)
-    generate_volumerize_files(hosts)
     generate_filebrowser_file(username, password)
     generate_id_rsa_files()
-    generate_host_key_files(hosts)
 
     frames = []
     for i, host in enumerate(hosts):
-        building, services = init_machine_menu(host, i)
+        building_id, building_name, services = init_machine_menu(host, i)
         frames.append({'host': host,
-                       'building': building, 'services': services})
+                       'building_id': building_id,
+                       'building_name': building_name,
+                       'services': services})
 
     # When frames is not empty generate frame config
     if frames:
         generate_pb_framr_file(frames)
+        generate_volumerize_files(frames)
+        building_ids = [f['building_id'] for f in frames]
+        generate_host_key_files(building_ids)
 
     # print(answers)
     print(f"Configuration files for {stack_name} generated in {custom_path}")
@@ -1503,29 +1531,36 @@ def init_machine_menu(host, increment):
 
     :host: docker-machine host
     :increment: incrementing number to ensure ports are unique
-    :return: choosen building name and services
+    :return: choosen building id, name and services
     """
+    # Print divider
+    print('----------')
     # Prompt for services
-    building = qust.text(f'Choose a name for building on server {host}',
-                         default=f'{host}', style=st).ask()
+    building_id = qust.text(
+        f'Choose an identifier for the building on server {host} '
+        '(lowercase no space)',
+        default=f'{host}', style=st).ask()
+    building = qust.text(
+        f'Choose a display name for building on server {host}',
+        default=f'{host.capitalize()}', style=st).ask()
     services = qust.checkbox(f'What services shall {host} provide?',
                              choices=generate_cb_service_choices(checked=True),
                              style=st).ask()
     if Service.OPENHAB in services:
-        add_openhab_service(host)
+        add_openhab_service(building_id, host)
     if Service.NODERED in services:
-        add_nodered_service(host)
+        add_nodered_service(building_id)
     if Service.MQTT in services:
-        add_mqtt_service(host, increment)
+        add_mqtt_service(building_id, increment)
     if Service.POSTGRES in services:
-        add_postgres_service(host)
+        add_postgres_service(building_id)
     if Service.BACKUP in services:
-        add_volumerize_service(host)
+        add_volumerize_service(building_id)
     if Service.FILES in services:
-        add_file_service(host)
+        add_file_service(building_id)
     if Service.SFTP in services:
-        add_sftp_service(host, increment)
-    return building, services
+        add_sftp_service(building_id, increment)
+    return building_id, building, services
 
 
 # *** Exec Menu Entries ***
@@ -1779,6 +1814,8 @@ def backup_menu(args):
     elif "Restore" in choice:
         restore_backup_menu()
         print("Restore")
+    else:
+        print(get_current_building_constraints())
 
 
 def execute_backup_menu():
