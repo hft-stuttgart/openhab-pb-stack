@@ -1266,6 +1266,29 @@ def get_service_list(manager=None):
     return [s.name for s in client.services.list()]
 
 
+def remove_label_from_nodes(label, value, manager=None):
+    """Removes label with matching value from all nodes
+
+    :label: Label you want to remove
+    :value: The value to match before removing
+    :manager: Docker machine to use for command, otherwise local
+    """
+    client = get_docker_client(manager)
+
+    nodes = client.nodes.list()
+    matching_nodes = [n for n in nodes
+                      if label in n.attrs['Spec']['Labels']
+                      and n.attrs['Spec']['Labels'][label] == value]
+    print(f'Matches {matching_nodes}')
+    for m in matching_nodes:
+        spec = m.attrs['Spec']
+        spec['Labels'].pop(label)
+        m.update(spec)
+        logging.info(f'Remove label {label} with value {value} from {m}')
+
+    client.close()
+
+
 def assign_label_to_node(nodeid, label, value, manager=None):
     """Assigns a label to a node (e.g. building)
 
@@ -1330,7 +1353,7 @@ def get_docker_client(manager=None):
     return client
 
 
-def restore_building_backup(manager, building):
+def restore_building_backup(manager, building, new_machine=None):
     client = get_docker_client(manager)
     # get backup services of the building
     services = client.services.list(filters={'label': f'backup={building}'})
@@ -1343,13 +1366,24 @@ def restore_building_backup(manager, building):
     print("Wait for services to shutdown...")
     sleep(10)
 
-    # execute restore command in backup service
-    run_command_in_service('backup', 'restore', manager)
+    # When a new machine is used, (un-)assign labels
+    if new_machine:
+        remove_label_from_nodes('building', building, manager)
+        assign_label_to_node(new_machine, 'building', building, manager)
+        print("Wait for services to start on new machine")
+        sleep(10)
+        run_command_in_service('backup', 'restore', new_machine)
+    else:
+        # execute restore command in backup service
+        run_command_in_service('backup', 'restore', manager)
 
     # reload and scale up services again
     for s in services:
         s.reload()
         s.scale(1)
+
+    # close client
+    client.close()
 # >>>
 
 
@@ -1807,15 +1841,16 @@ def backup_menu(args):
     """
     # Ask for action
     choice = qust.select("What do you want to do?", choices=[
-        'Execute backup', 'Restore backup', 'Exit'],
+        'Execute backup', 'Restore backup', 'Move building', 'Exit'],
         style=st).ask()
     if "Execute" in choice:
         execute_backup_menu()
     elif "Restore" in choice:
         restore_backup_menu()
         print("Restore")
-    else:
-        print(get_current_building_constraints())
+    elif "Move" in choice:
+        restore_new_building_menu()
+        print("Move")
 
 
 def execute_backup_menu():
@@ -1846,6 +1881,25 @@ def restore_backup_menu():
 
     if confirm:
         restore_building_backup(machine, machine)
+        print("Restore completed")
+    else:
+        print("Restore canceled")
+
+
+def restore_new_building_menu():
+    """Submenu for backup execution on a new building
+    """
+    machine = docker_client_prompt(" to execute restores with.")
+    current_building = compose_building_prompt(" to move")
+    new_machine = docker_client_prompt(" to move building to")
+    confirm = qust.confirm(
+        f'Recreate {current_building} from last backup'
+        f' on machine {new_machine}',
+        default=False,
+        style=st).ask()
+
+    if confirm:
+        restore_building_backup(machine, current_building, new_machine)
         print("Restore completed")
     else:
         print("Restore canceled")
@@ -1884,6 +1938,17 @@ def docker_client_prompt(message_details=''):
     machine = qust.select(f'Choose manager machine{message_details}',
                           choices=get_machine_list(), style=st).ask()
     return machine
+
+
+def compose_building_prompt(message_details=''):
+    """Show list of building contraints used in compose
+
+    :returns: Docker client instance
+    """
+    building = qust.select(f'Choose building{message_details}:',
+                           choices=get_current_building_constraints(),
+                           style=st).ask()
+    return building
 # >>>
 
 
