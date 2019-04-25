@@ -1272,6 +1272,7 @@ def remove_label_from_nodes(label, value, manager=None):
     :label: Label you want to remove
     :value: The value to match before removing
     :manager: Docker machine to use for command, otherwise local
+    :return: Nodes with removed label
     """
     client = get_docker_client(manager)
 
@@ -1287,6 +1288,7 @@ def remove_label_from_nodes(label, value, manager=None):
         logging.info(f'Remove label {label} with value {value} from {m}')
 
     client.close()
+    return [n.id for n in matching_nodes]
 
 
 def assign_label_to_node(nodeid, label, value, manager=None):
@@ -1368,11 +1370,17 @@ def restore_building_backup(manager, building, new_machine=None):
 
     # When a new machine is used, (un-)assign labels
     if new_machine:
-        remove_label_from_nodes('building', building, manager)
+        old_nodes = remove_label_from_nodes('building', building, manager)
         assign_label_to_node(new_machine, 'building', building, manager)
         print("Wait for services to start on new machine")
-        sleep(10)
-        run_command_in_service('backup', 'restore', new_machine)
+        if wait_for_containers(new_machine, 'backup|sftp', expected_count=2):
+            run_command_in_service('backup', 'restore', new_machine)
+        else:
+            logging.error(f"Failed to start services on {new_machine}")
+            # restore labels to old nodes
+            remove_label_from_nodes('building', building, manager)
+            for on in old_nodes:
+                assign_label_to_node(on, 'building', building, manager)
     else:
         # execute restore command in backup service
         run_command_in_service('backup', 'restore', manager)
@@ -1384,6 +1392,30 @@ def restore_building_backup(manager, building, new_machine=None):
 
     # close client
     client.close()
+
+
+def wait_for_containers(machine, name_filter, expected_count=1, timeout=60):
+    """Waits until containers matching filters are available
+
+    :machine: machine to check for container
+    :name_filter: regexp to filter names by
+    :expected_count: number of services that are expected to match
+    :timeout: Time to at least wait for before abborting check
+    :returns: true if found, false when timed out
+    """
+    client = get_docker_client(machine)
+    for t in range(timeout):
+        cl = client.containers.list(filters={'name': name_filter})
+        if len(cl) >= expected_count:
+            logging.info("Let serivces boot up")
+            sleep(3)
+            return True
+        else:
+            sleep(1)
+    logging.error(f"Timed out wait for containers matching {name_filter}.")
+    return False
+
+
 # >>>
 
 
