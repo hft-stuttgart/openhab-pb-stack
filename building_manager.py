@@ -196,6 +196,32 @@ def add_openhab_service(building, host):
     add_or_update_compose_service(compose_path, service_name, template)
 
 
+def move_openhab_service(building, new_host):
+    """Updates an openhab entry to be accessible on another host
+
+    :building: name of building that the services is uses
+    :host: host the building service is moved to, used for routing
+    """
+    # compose file
+    compose_path = f'{custom_path}/{COMPOSE_NAME}'
+    # service name
+    service_name = f'openhab_{building}'
+    # template
+    entry = get_service_entry(service_name)
+    # traefik remove old domain by filtering
+    old_labels = entry['deploy']['labels']
+    filtered_labels = [
+        l for l in old_labels
+        if not l.startswith('traefik.main.frontend')]
+    # traefik frontend new_domain->openhab
+    filtered_labels.extend(
+        generate_traefik_host_labels(new_host, segment='main'))
+
+    entry['deploy']['labels'] = filtered_labels
+
+    add_or_update_compose_service(compose_path, service_name, entry)
+
+
 def add_nodered_service(building):
     """Generates an nodered entry and adds it to the compose file
 
@@ -513,6 +539,20 @@ def dict_to_yaml_list(pdict):
     :return: list of a yaml containing colon separated entries
     """
     return [f'{k}:{v}' for (k, v) in pdict.items()]
+
+
+def get_service_entry(service_name):
+    """Gets a service entry from the compose yaml
+
+    :return: yaml entry of a service
+    """
+    # compose file
+    compose_path = f'{custom_path}/{COMPOSE_NAME}'
+
+    with open(compose_path, 'r') as templates_file:
+        compose_content = yaml.load(templates_file)
+
+    return compose_content['services'][service_name]
 
 
 def get_service_template(service_name):
@@ -1370,13 +1410,18 @@ def restore_building_backup(manager, building, new_machine=None):
 
     # When a new machine is used, (un-)assign labels
     if new_machine:
+        # Remove old node labels and add new
         old_nodes = remove_label_from_nodes('building', building, manager)
         assign_label_to_node(new_machine, 'building', building, manager)
         print("Wait for services to start on new machine")
         if wait_for_containers(new_machine, 'backup|sftp', expected_count=2):
             run_command_in_service('backup', 'restore', new_machine)
+            # When building was moved update host entry of openhab in compose
+            move_openhab_service(building, new_machine)
         else:
-            logging.error(f"Failed to start services on {new_machine}")
+            logging.error(
+                f"Failed to start services on {new_machine}, "
+                " rolling back changes")
             # restore labels to old nodes
             remove_label_from_nodes('building', building, manager)
             for on in old_nodes:
@@ -1495,7 +1540,8 @@ def main_menu(args):
                          choices=load_main_entires(), style=st).ask()
 
     # Call funtion of menu entry
-    choice(args)
+    if choice:
+        choice(args)
 
 
 def load_main_entires():
@@ -1672,19 +1718,24 @@ def new_user_menu():
         else:
             print(f"User with name {username} already exists, try again")
 
-    # Ensure passwords match
+    # Ensure passwords match (only if username was selected)
     password_match = False
-    while not password_match:
+    password = None
+    while username and not password_match:
         password = qust.password(
             f'Choose a password for the user {username}:', style=st).ask()
-        confirm = qust.password(
-            f'Repeat password for the user {username}:', style=st).ask()
+        confirm = (qust.password(
+            f'Repeat password for the user {username}:',
+            style=st)
+            .skip_if(not password, default=None)
+            .ask())
         if password == confirm:
             password_match = True
         else:
             print("Passwords did not match, try again")
 
-    add_user_to_traefik_file(username, password)
+    if password and username:
+        add_user_to_traefik_file(username, password)
 
 
 def modify_user_menu():
@@ -1694,7 +1745,9 @@ def modify_user_menu():
     user = qust.select("Choose user to modify:",
                        choices=current_users, style=st).ask()
 
-    if user == 'ohadmin':
+    if user is None:
+        return
+    elif user == 'ohadmin':
         choices = [{'name': 'Delete user',
                     'disabled': 'Disabled: cannot delete admin user'},
                    'Change password', 'Exit']
@@ -1704,6 +1757,8 @@ def modify_user_menu():
     action = qust.select(
         f"What should we do with {user}?", choices=choices, style=st).ask()
 
+    if action is None:
+        return
     if 'Delete' in action:
         is_sure = qust.confirm(
             f"Are you sure you want to delete user {user}?", style=st).ask()
@@ -1714,13 +1769,16 @@ def modify_user_menu():
         while not password_match:
             password = qust.password(
                 f'Choose a password for the user {user}:', style=st).ask()
-            confirm = qust.password(
-                f'Repeat password for the user {user}:', style=st).ask()
+            confirm = (qust.password(
+                f'Repeat password for the user {user}:', style=st)
+                .skip_if(password is None, default=None)
+                .ask())
             if password == confirm:
                 password_match = True
             else:
                 print("Passwords did not match, try again")
-        add_user_to_traefik_file(user, password)
+        if password:
+            add_user_to_traefik_file(user, password)
 
 
 # *** Service Menu Entries ***
@@ -1740,10 +1798,12 @@ def service_menu(args):
         service_modify_menu()
     elif "Start" in choice:
         machine = docker_client_prompt(" to execute deploy")
-        deploy_docker_stack(machine)
+        if machine:
+            deploy_docker_stack(machine)
     elif "Stop" in choice:
         machine = docker_client_prompt(" to execute remove")
-        remove_docker_stack(machine)
+        if machine:
+            remove_docker_stack(machine)
 
 
 def service_add_menu():
@@ -1754,11 +1814,16 @@ def service_add_menu():
         'What service do you want to add?', style=st,
         choices=generate_cb_service_choices(service_list=services)).ask()
 
-    host = qust.select('Where should the service be located?',
-                       choices=generate_cb_choices(
-                           get_machine_list()), style=st).ask()
-    identifier = qust.text(
-        'Input an all lower case identifier:', style=st).ask()
+    host = (qust.select('Where should the service be located?',
+                        choices=generate_cb_choices(
+                            get_machine_list()), style=st)
+            .skip_if(not service, default=None)
+            .ask())
+    identifier = (qust.text(
+        'Input an all lower case identifier:',
+        style=st)
+        .skip_if(not host, default=None)
+        .ask())
 
     if service and host and identifier:
         if service == Service.POSTGRES:
@@ -1772,17 +1837,23 @@ def service_modify_menu():
     service = qust.select(
         'What service do you want to modify?', choices=services).ask()
 
-    if service in ['proxy', 'landing']:
+    if service is None:
+        return
+    elif service in ['proxy', 'landing']:
         choices = [{'name': 'Remove service',
                     'disabled': 'Disabled: cannot remove framework services'},
                    'Exit']
     else:
         choices = ['Remove service', 'Exit']
 
-    action = qust.select(
-        f"What should we do with {service}?", choices=choices, style=st).ask()
+    action = (qust.select(
+        f"What should we do with {service}?", choices=choices, style=st)
+        .skip_if(not service, default=None)
+        .ask())
 
-    if 'Remove' in action:
+    if action is None:
+        return
+    elif 'Remove' in action:
         delete_service(service)
 
 
@@ -1819,50 +1890,64 @@ def device_install_menu():
     """
     machine = docker_client_prompt(" to install usb support")
 
-    # Name of base dir on machines
-    external_base_dir = os.path.basename(base_dir)
+    if machine:
+        # Name of base dir on machines
+        external_base_dir = os.path.basename(base_dir)
 
-    # Check if files are available on targeted machine
-    machine_dir = f"{external_base_dir}/install-usb-support.sh"
-    print(machine_dir)
-    if not check_file_on_machine(machine_dir, machine):
-        print("Scripts missing on machine, will be copied")
-        copy_files_to_machine(base_dir, machine)
+        # Check if files are available on targeted machine
+        machine_dir = f"{external_base_dir}/install-usb-support.sh"
+        print(machine_dir)
+        if not check_file_on_machine(machine_dir, machine):
+            print("Scripts missing on machine, will be copied")
+            copy_files_to_machine(base_dir, machine)
+        else:
+            print("Scripts available on machine")
+
+        execute_command_on_machine(f'sudo {machine_dir}', machine)
     else:
-        print("Scripts available on machine")
-
-    execute_command_on_machine(f'sudo {machine_dir}', machine)
+        print("Cancelled device script installation")
 
 
 def device_link_menu():
     """Link device to a service
     """
     machine = docker_client_prompt(" to link device on")
-    device = qust.select("What device should be linked?",
-                         choices=USB_DEVICES, style=st).ask()
+    device = (qust.select("What device should be linked?",
+                          choices=USB_DEVICES,
+                          style=st)
+              .skip_if(not machine, default=None)
+              .ask())
 
-    # Start systemd service that ensures link (escapes of backslash needed)
-    link_cmd = f"sudo systemctl enable --now swarm-device@" + \
-        f"{device}\\\\\\\\x20openhab.service"
+    if machine and device:
+        # Start systemd service that ensures link (escapes of backslash needed)
+        link_cmd = f"sudo systemctl enable --now swarm-device@" + \
+            f"{device}\\\\\\\\x20openhab.service"
 
-    # Needs enable to keep after reboot
-    execute_command_on_machine(link_cmd, machine)
-    print(f"Linked device {device} to openHAB service on machine {machine}")
+        # Needs enable to keep after reboot
+        execute_command_on_machine(link_cmd, machine)
+        print(f"Linked device {device} to openHAB service on {machine}")
+    else:
+        print("Cancelled device linking")
 
 
 def device_unlink_menu():
     """Unlink a device from a service
     """
     machine = docker_client_prompt(" to unlink device from")
-    device = qust.select("What device should be unlinked?",
-                         choices=USB_DEVICES, style=st).ask()
+    device = (qust.select("What device should be unlinked?",
+                          choices=USB_DEVICES, style=st)
+              .skip_if(not machine, default=None)
+              .ask())
 
-    # Stop systemd service that ensures link (escapes of backslash needed)
-    link_cmd = f"sudo systemctl disable --now swarm-device@" + \
-        f"{device}\\\\\\\\x20openhab.service"
+    if machine and device:
+        # Stop systemd service that ensures link (escapes of backslash needed)
+        link_cmd = f"sudo systemctl disable --now swarm-device@" + \
+            f"{device}\\\\\\\\x20openhab.service"
 
-    execute_command_on_machine(link_cmd, machine)
-    print(f"Unlinked device {device} on machine {machine}")
+        execute_command_on_machine(link_cmd, machine)
+        print(f"Unlinked device {device} on machine {machine}")
+    else:
+        print("Cancelled device unlinking")
 
 
 # *** Backup Menu Entries ***
@@ -1879,10 +1964,8 @@ def backup_menu(args):
         execute_backup_menu()
     elif "Restore" in choice:
         restore_backup_menu()
-        print("Restore")
     elif "Move" in choice:
         restore_new_building_menu()
-        print("Move")
 
 
 def execute_backup_menu():
@@ -1890,9 +1973,14 @@ def execute_backup_menu():
     """
     machine = docker_client_prompt(" to backup")
 
-    full = qust.confirm("Execute full backup (otherwise partial)?",
-                        default=False, style=st).ask()
-    if full:
+    full = (qust.confirm("Execute full backup (otherwise partial)?",
+                         default=False, style=st)
+            .skip_if(not machine, default=None)
+            .ask())
+
+    if full is None:
+        return
+    elif full:
         run_command_in_service('backup', 'backupFull', machine)
         print("Full backup completed")
     else:
@@ -1905,11 +1993,13 @@ def restore_backup_menu():
     """
     machine = docker_client_prompt(" to restore")
 
-    confirm = qust.confirm(
+    confirm = (qust.confirm(
         f'Restore services from last backup on machine {machine} '
         '(current data will be lost)?',
         default=False,
-        style=st).ask()
+        style=st)
+        .skip_if(not machine, default=None)
+        .ask())
 
     if confirm:
         restore_building_backup(machine, machine)
@@ -1922,17 +2012,19 @@ def restore_new_building_menu():
     """Submenu for backup execution on a new building
     """
     machine = docker_client_prompt(" to execute restores with.")
-    current_building = compose_building_prompt(" to move")
-    new_machine = docker_client_prompt(" to move building to")
-    confirm = qust.confirm(
+    current_building = compose_building_prompt(" to move", skip_if=not machine)
+    new_machine = docker_client_prompt(" to move building to",
+                                       skip_if=not current_building)
+    confirm = (qust.confirm(
         f'Recreate {current_building} from last backup'
         f' on machine {new_machine}',
         default=False,
-        style=st).ask()
+        style=st)
+        .skip_if(not new_machine, default=False)
+        .ask())
 
     if confirm:
         restore_building_backup(machine, current_building, new_machine)
-        print("Restore completed")
     else:
         print("Restore canceled")
 
@@ -1961,25 +2053,27 @@ def generate_cb_service_choices(checked=False, service_list=None):
     ]
 
 
-def docker_client_prompt(message_details=''):
+def docker_client_prompt(message_details='', skip_if=False):
     """Show list of docker machines and return selection
 
     :manager: Optional machine to use, prompt otherwise
     :returns: Docker client instance
     """
-    machine = qust.select(f'Choose manager machine{message_details}',
-                          choices=get_machine_list(), style=st).ask()
+    machine = (qust.select(f'Choose manager machine{message_details}',
+                           choices=get_machine_list(), style=st)
+               .skip_if(skip_if, default=None)
+               .ask())
     return machine
 
 
-def compose_building_prompt(message_details=''):
+def compose_building_prompt(message_details='', skip_if=False):
     """Show list of building contraints used in compose
 
     :returns: Docker client instance
     """
     building = qust.select(f'Choose building{message_details}:',
                            choices=get_current_building_constraints(),
-                           style=st).ask()
+                           style=st).skip_if(skip_if, default=None).ask()
     return building
 # >>>
 
