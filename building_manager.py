@@ -6,6 +6,7 @@ from typing import NamedTuple
 import logging
 import os
 import sys
+import json as pyjson
 from hashlib import md5
 from shutil import copy2
 from subprocess import PIPE, run
@@ -960,6 +961,28 @@ def generate_pb_framr_file(frames):
         EDIT_FILES['pb_framr_pages'], configs, json=True)
 
 
+def update_pb_framr_host(old_host, new_host):
+    """Updates framr config to use changed host name
+
+    :old_host: old host that shall be replaced
+    :new_host: host that will be the new target
+    """
+    configs = []
+
+    config_path = EDIT_FILES['pb_framr_pages']
+    custom_config_path = f'{custom_path}/{config_path}'
+    with open(custom_config_path, 'r') as file:
+        configs = pyjson.load(file)
+        for c in configs:
+            for e in c['entries']:
+                if e['url'] == f"http://{old_host}/":
+                    e['url'] = f"http://{new_host}/"
+
+    if configs:
+        create_or_replace_config_file(
+            EDIT_FILES['pb_framr_pages'], configs, json=True)
+
+
 def create_or_replace_config_file(config_path, content, json=False):
     """Creates or replaces a config file with new content
 
@@ -1328,7 +1351,7 @@ def remove_label_from_nodes(label, value, manager=None):
         logging.info(f'Remove label {label} with value {value} from {m}')
 
     client.close()
-    return [n.id for n in matching_nodes]
+    return [n.attrs['Description']['Hostname'] for n in matching_nodes]
 
 
 def assign_label_to_node(nodeid, label, value, manager=None):
@@ -1418,6 +1441,7 @@ def restore_building_backup(manager, building, new_machine=None):
             run_command_in_service('backup', 'restore', new_machine)
             # When building was moved update host entry of openhab in compose
             move_openhab_service(building, new_machine)
+            update_pb_framr_host(old_nodes[0], new_machine)
         else:
             logging.error(
                 f"Failed to start services on {new_machine}, "
@@ -1426,6 +1450,7 @@ def restore_building_backup(manager, building, new_machine=None):
             remove_label_from_nodes('building', building, manager)
             for on in old_nodes:
                 assign_label_to_node(on, 'building', building, manager)
+                update_pb_framr_host(new_machine, on)
     else:
         # execute restore command in backup service
         run_command_in_service('backup', 'restore', manager)
