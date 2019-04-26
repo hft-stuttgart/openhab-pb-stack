@@ -1585,9 +1585,16 @@ def init_menu(args):
     """
     # Prompts
     stack_name = qust.text('Choose a name for your setup', style=st).ask()
-    hosts = qust.checkbox('What docker machines will be used?',
-                          choices=generate_cb_choices(
-                              get_machine_list()), style=st).ask()
+    hosts = (qust.checkbox(
+        'What docker machines will be used?',
+        choices=generate_cb_choices(get_machine_list()),
+        style=st)
+        .skip_if(not stack_name)
+        .ask())
+
+    # Cancel init if no hosts selected
+    if not hosts:
+        return
     # Ensure passwords match
     password_match = False
     while not password_match:
@@ -1603,22 +1610,17 @@ def init_menu(args):
     # Initialize custom configuration dirs and templates
     generate_config_folders()
     generate_initial_compose()
-    # Generate config files based on input
-    username = ADMIN_USER
-    generate_sftp_file(username, password, ['backup_data/backup'])
-    generate_postgres_files(username, password)
-    generate_mosquitto_file(username, password)
-    generate_traefik_file(username, password)
-    generate_filebrowser_file(username, password)
-    generate_id_rsa_files()
 
     frames = []
     for i, host in enumerate(hosts):
         building_id, building_name, services = init_machine_menu(host, i)
-        frames.append({'host': host,
-                       'building_id': building_id,
-                       'building_name': building_name,
-                       'services': services})
+        if building_id and building_name and services:
+            frames.append({'host': host,
+                           'building_id': building_id,
+                           'building_name': building_name,
+                           'services': services})
+        else:
+            return
 
     # When frames is not empty generate frame config
     if frames:
@@ -1626,16 +1628,27 @@ def init_menu(args):
         generate_volumerize_files(frames)
         building_ids = [f['building_id'] for f in frames]
         generate_host_key_files(building_ids)
+        # Generate config files based on input
+        username = ADMIN_USER
+        generate_sftp_file(username, password, ['backup_data/backup'])
+        generate_postgres_files(username, password)
+        generate_mosquitto_file(username, password)
+        generate_traefik_file(username, password)
+        generate_filebrowser_file(username, password)
+        generate_id_rsa_files()
 
-    # print(answers)
-    print(f"Configuration files for {stack_name} generated in {custom_path}")
+        # print(answers)
+        print(f"Configuration files for {stack_name} created in {custom_path}")
 
-    # Check if changes shall be applied to docker environment
-    generate = qust.confirm(
-        'Apply changes to docker environment?', default=True, style=st).ask()
+        # Check if changes shall be applied to docker environment
+        generate = (qust.confirm(
+            'Apply changes to docker environment?',
+            default=True,
+            style=st)
+            .ask())
 
-    if generate:
-        generate_swarm(hosts)
+        if generate:
+            generate_swarm(hosts)
 
 
 def init_machine_menu(host, increment):
@@ -1643,21 +1656,33 @@ def init_machine_menu(host, increment):
 
     :host: docker-machine host
     :increment: incrementing number to ensure ports are unique
-    :return: choosen building id, name and services
+    :return: choosen building id, name and services or None if canceld
     """
     # Print divider
     print('----------')
     # Prompt for services
-    building_id = qust.text(
+    building_id = (qust.text(
         f'Choose an identifier for the building on server {host} '
         '(lowercase no space)',
-        default=f'{host}', style=st).ask()
-    building = qust.text(
+        default=f'{host}', style=st)
+        .skip_if(not host)
+        .ask())
+
+    building = (qust.text(
         f'Choose a display name for building on server {host}',
-        default=f'{host.capitalize()}', style=st).ask()
-    services = qust.checkbox(f'What services shall {host} provide?',
-                             choices=generate_cb_service_choices(checked=True),
-                             style=st).ask()
+        default=f'{host.capitalize()}', style=st)
+        .skip_if(not building_id)
+        .ask())
+
+    services = (qust.checkbox(
+        f'What services shall {host} provide?',
+        choices=generate_cb_service_choices(checked=True),
+        style=st)
+        .skip_if(not building)
+        .ask())
+
+    if services is None:
+        return None, None, None
     if Service.OPENHAB in services:
         add_openhab_service(building_id, host)
     if Service.NODERED in services:
@@ -1727,7 +1752,7 @@ def new_user_menu():
         confirm = (qust.password(
             f'Repeat password for the user {username}:',
             style=st)
-            .skip_if(not password, default=None)
+            .skip_if(not password)
             .ask())
         if password == confirm:
             password_match = True
@@ -1771,7 +1796,7 @@ def modify_user_menu():
                 f'Choose a password for the user {user}:', style=st).ask()
             confirm = (qust.password(
                 f'Repeat password for the user {user}:', style=st)
-                .skip_if(password is None, default=None)
+                .skip_if(password is None)
                 .ask())
             if password == confirm:
                 password_match = True
@@ -1817,12 +1842,12 @@ def service_add_menu():
     host = (qust.select('Where should the service be located?',
                         choices=generate_cb_choices(
                             get_machine_list()), style=st)
-            .skip_if(not service, default=None)
+            .skip_if(not service)
             .ask())
     identifier = (qust.text(
         'Input an all lower case identifier:',
         style=st)
-        .skip_if(not host, default=None)
+        .skip_if(not host)
         .ask())
 
     if service and host and identifier:
@@ -1848,7 +1873,7 @@ def service_modify_menu():
 
     action = (qust.select(
         f"What should we do with {service}?", choices=choices, style=st)
-        .skip_if(not service, default=None)
+        .skip_if(not service)
         .ask())
 
     if action is None:
@@ -1915,7 +1940,7 @@ def device_link_menu():
     device = (qust.select("What device should be linked?",
                           choices=USB_DEVICES,
                           style=st)
-              .skip_if(not machine, default=None)
+              .skip_if(not machine)
               .ask())
 
     if machine and device:
@@ -1936,7 +1961,7 @@ def device_unlink_menu():
     machine = docker_client_prompt(" to unlink device from")
     device = (qust.select("What device should be unlinked?",
                           choices=USB_DEVICES, style=st)
-              .skip_if(not machine, default=None)
+              .skip_if(not machine)
               .ask())
 
     if machine and device:
@@ -1975,7 +2000,7 @@ def execute_backup_menu():
 
     full = (qust.confirm("Execute full backup (otherwise partial)?",
                          default=False, style=st)
-            .skip_if(not machine, default=None)
+            .skip_if(not machine)
             .ask())
 
     if full is None:
@@ -1998,7 +2023,7 @@ def restore_backup_menu():
         '(current data will be lost)?',
         default=False,
         style=st)
-        .skip_if(not machine, default=None)
+        .skip_if(not machine)
         .ask())
 
     if confirm:
@@ -2061,7 +2086,7 @@ def docker_client_prompt(message_details='', skip_if=False):
     """
     machine = (qust.select(f'Choose manager machine{message_details}',
                            choices=get_machine_list(), style=st)
-               .skip_if(skip_if, default=None)
+               .skip_if(skip_if)
                .ask())
     return machine
 
@@ -2073,7 +2098,7 @@ def compose_building_prompt(message_details='', skip_if=False):
     """
     building = qust.select(f'Choose building{message_details}:',
                            choices=get_current_building_constraints(),
-                           style=st).skip_if(skip_if, default=None).ask()
+                           style=st).skip_if(skip_if).ask()
     return building
 # >>>
 
