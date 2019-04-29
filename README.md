@@ -183,8 +183,6 @@ sudo systemctl enable --now swarm-device@zwave_stick\\x20openhab.service
 sudo systemctl disable --now swarm-device@zwave_stick\\x20openhab.service
 ```
 
-
-
 ## How it works
 
 Following parts describe a little more in detail how the script works and how parts may be executed manually.
@@ -357,3 +355,5 @@ SUBSYSTEMS=="usb", ATTRS{idVendor}=="vvvv", ATTRS{idProduct}=="pppp", GROUP="dia
 To use this new rule simply rerun the installation of the device scripts as explained above. After replugging the device it will now always be available by the name defined with `SYMLINK+=`, e.g. `/dev/my_serial`.
 
 From now on the device can be linked manually already by creating a systemd entry manually using its device name. To make the script aware of the new device (and have an entry in the menu) simply extend the constant `USB_DEVICES` in the `building_manager.py` by a new entry using the device name as the value.
+
+Also note openHAB manages the serial devices it can access using a whitelist (see here for details). SO when adding a new device extend this whitelist using the EXTRA_JAVA_OPTS entry of openHAB in the compose file (and also in the template to have it available on new installs).
