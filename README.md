@@ -168,6 +168,10 @@ A further addition is a backup menu. It allows to execute backups by executing t
 
 ![backup_menu](docs/images/backup_menu.png)
 
+When a backup exists the menu also offers to move a building (e.g. usefull when changing the machine after a system error). In this case the applications adjust the labels of the nodes and automatically restores the building on the new machine.
+
+By default backups are automatically created at 04:00AM. This and the detailed backup settings can be changed, see the [volumerize documentation](https://github.com/blacklabelops/volumerize) for details.
+
 ### Manage Devices
 
 An automation setup needs to access several different devices to be able to communicate with sensors and actors (e.g. an USB Z-Wave modem). These are by default not accessible to docker containers, docker swarm also does not provide a default way to grant access to them. Docker uses cgroups to manage device access though. This enables us to grant the correct cgroup permissions when a container launches. The script offers a menu entry to install the necessary files and rules on any connected node. A second entry then allows to setup links between containers and devices. 
@@ -356,4 +360,4 @@ To use this new rule simply rerun the installation of the device scripts as expl
 
 From now on the device can be linked manually already by creating a systemd entry manually using its device name. To make the script aware of the new device (and have an entry in the menu) simply extend the constant `USB_DEVICES` in the `building_manager.py` by a new entry using the device name as the value.
 
-Also note openHAB manages the serial devices it can access using a whitelist (see here for details). SO when adding a new device extend this whitelist using the EXTRA_JAVA_OPTS entry of openHAB in the compose file (and also in the template to have it available on new installs).
+Also note openHAB manages the serial devices it can access using a whitelist (see [here](https://www.openhab.org/addons/bindings/serial1/) for details). So when adding a new device extend this whitelist using the EXTRA_JAVA_OPTS entry of openHAB in the compose file (and also in the template to have it available on new installs).
